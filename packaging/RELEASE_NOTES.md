@@ -9,6 +9,14 @@
 | Linux (x86_64) | `AluPC-linux-x86_64-….tar.gz` | ohne Installation: entpacken, `AluPC/AluPC` starten |
 | Kubuntu / Ubuntu | `AluPC-installieren.sh` | installiert die .deb daneben (oder lädt sie), wartet auf laufende Updates |
 
+### Neu in 2.4.4 – AirPlay wieder im Vollbild (Windows)
+- **AirPlay-Bild füllt Monitor 2 wieder ganz:** UxPlay setzt sein Fenster auf die Videogröße zurück, sobald das
+  iPhone-Bild kommt oder sich dreht (auf einem 4K-Fernseher nur noch ein Viertel oben links). AluPC prüft das
+  jetzt jede Sekunde und zieht es wieder randlos über den ganzen Bildschirm.
+- **Firewall:** AluPC fragt einmal neu nach der Freigabe und ersetzt Windows' Sperrregeln für UxPlay
+  („Ein Teil dieser App wurde blockiert“).
+- Unter Windows nicht auf echter Hardware getestet.
+
 ### Neu in 2.4.3 – Tastenbox: mehrere Aktionen, geheime Tastenfolgen, bessere MIDIs; neue Design-Auswahl
 - **Mehrere Aktionen je Regel:** Wenn → Dann kann jetzt mehrere Dinge nacheinander tun („Weitere Aktion“).
 - **Jede Taste wartet kurz** (Standard, abschaltbar, Wartezeit einstellbar): sonst sah man an sofort reagierenden

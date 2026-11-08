@@ -875,7 +875,7 @@ def setup_plan(config) -> list[tuple[str, list[str]]]:
 
 # 2: AirPlay für alle Netzwerktypen (Windows stuft WLANs oft als „Öffentlich“ ein → iPhone sieht „AluPC“, kann
 #    sich aber nicht verbinden) + von Windows angelegte Sperr-Regeln für UxPlay entfernen
-FIREWALL_VERSION = 2
+FIREWALL_VERSION = 3  # 3: UxPlay-Sperrregeln nach „Ein Teil dieser App wurde blockiert“ ersetzen
 
 
 def uxplay_programs() -> list[str]:

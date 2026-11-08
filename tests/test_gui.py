@@ -1797,6 +1797,13 @@ def test_handy_windows_mode(env, tmp_path, monkeypatch):
     assert len(moved) == 2
     controller._follow_timer.timeout.emit()
     assert len(moved) == 2  # nicht dauernd neu schieben
+    # UxPlay setzt sein Fenster auf Videogröße zurück (Bild kommt / dreht sich) → wieder über ganz Monitor 2
+    monkeypatch.setattr(controller.windows, "window_fits", lambda wid, out, rect: False, raising=False)
+    controller._follow_timer.timeout.emit()
+    assert len(moved) == 3
+    monkeypatch.setattr(controller.windows, "window_fits", lambda wid, out, rect: True, raising=False)
+    controller._follow_timer.timeout.emit()
+    assert len(moved) == 3  # passt wieder → in Ruhe lassen
     open_windows[:] = [WindowInfo(id="0x2", title="AluPC", app="uxplay")]  # neue Verbindung → neues Fenster
     controller._follow_timer.timeout.emit()
     assert moved[-1][0] == "0x2"

@@ -1382,6 +1382,13 @@ class Controller(QObject):
             for w in windows:
                 if is_iphone_window(w.title, w.app, titles):
                     present.add(w.id)
+                    fits = getattr(self.windows, "window_fits", None)
+                    if w.id in placed and fits is not None and self.config["handy"].get("airplay_borderless", True):
+                        try:  # UxPlay hat sich auf Videogröße verkleinert (Bild kam/drehte sich) → wieder groß
+                            if not fits(w.id, screen.name(), rect):
+                                placed.discard(w.id)
+                        except Exception:  # noqa: BLE001
+                            pass
                     if w.id not in placed:
                         try:
                             place = getattr(self.windows, "present_window", None) \
@@ -1397,7 +1404,7 @@ class Controller(QObject):
             if self._handy_window == "airplay-quelle":  # iPhone-Bild da → Warte-Bildschirm ausblenden
                 self.output.set_suspended(bool(present))
 
-        self._follow_timer = QTimer(self, interval=2000)
+        self._follow_timer = QTimer(self, interval=1000)  # Fenster schnell wieder groß ziehen
         self._follow_timer.timeout.connect(poll)
         self._follow_timer.start()
         poll()

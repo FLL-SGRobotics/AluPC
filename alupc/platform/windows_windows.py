@@ -60,6 +60,7 @@ class WindowsWindowBackend(WindowBackend):
         u.SetForegroundWindow.argtypes = [HWND]
         u.IsIconic.argtypes = [HWND]
         u.GetClassNameW.argtypes = [HWND, wintypes.LPWSTR, ctypes.c_int]
+        u.GetWindowRect.argtypes = [HWND, ctypes.POINTER(wintypes.RECT)]
         k = self.kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
         k.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
         k.OpenProcess.restype = wintypes.HANDLE
@@ -146,6 +147,16 @@ class WindowsWindowBackend(WindowBackend):
         u.SetWindowLongW(hwnd, GWL_STYLE, style & ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZE | WS_MAXIMIZE))
         u.ShowWindow(hwnd, SW_RESTORE)
         u.SetWindowPos(hwnd, wintypes.HWND(HWND_TOPMOST), x, y, w, h, SWP_SHOWWINDOW | SWP_FRAMECHANGED)
+
+    def window_fits(self, window_id, output_name, rect) -> bool:
+        """Liegt das Fenster noch genau über Monitor 2? UxPlay (GStreamer) setzt sein Fenster auf die Videogröße
+        zurück, sobald das iPhone-Bild kommt oder sich dreht – dann muss AluPC es wieder groß ziehen."""
+        r = wintypes.RECT()
+        if not self.user32.GetWindowRect(int(window_id), ctypes.byref(r)):
+            return True  # Fenster weg – nichts zu tun
+        x, y, w, h = monitor_rect(output_name) or rect
+        return abs(r.left - x) <= 2 and abs(r.top - y) <= 2 and abs(r.right - r.left - w) <= 2 \
+            and abs(r.bottom - r.top - h) <= 2
 
     def move_window(self, window_id, output_name, rect, fullscreen=False):
         self._move(int(window_id), output_name, rect, fullscreen)
