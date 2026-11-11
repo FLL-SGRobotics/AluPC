@@ -23,6 +23,17 @@ jobs:
         run: |
           printf 'Acquire::Retries "5";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\nDPkg::Lock::Timeout "120";\n' \
             | sudo tee /etc/apt/apt.conf.d/80-alupc-ci
+          # Störung 11.11.2026 (actions/runner-images#15297): die Ubuntu-Spiegel ließen sich auf den GitHub-Rechnern
+          # nicht auflösen. Dann auf den Spiegel von kernel.org ausweichen.
+          for host in azure.archive.ubuntu.com archive.ubuntu.com security.ubuntu.com; do
+            if ! getent hosts "$host" >/dev/null; then
+              echo "::warning title=Paketquellen::$host nicht erreichbar – weiche auf mirrors.edge.kernel.org aus"
+              for f in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/*; do
+                [ -f "$f" ] && sudo sed -i -E 's#https?://(azure\.archive|archive|security)\.ubuntu\.com/ubuntu/?#http://mirrors.edge.kernel.org/ubuntu/#g' "$f"
+              done
+              break
+            fi
+          done
       - name: Systembibliotheken für Qt
         run: |
           sudo apt-get update
@@ -148,6 +159,17 @@ jobs:
         run: |
           printf 'Acquire::Retries "5";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\nDPkg::Lock::Timeout "120";\n' \
             | sudo tee /etc/apt/apt.conf.d/80-alupc-ci
+          # Störung 11.11.2026 (actions/runner-images#15297): die Ubuntu-Spiegel ließen sich auf den GitHub-Rechnern
+          # nicht auflösen. Dann auf den Spiegel von kernel.org ausweichen.
+          for host in azure.archive.ubuntu.com archive.ubuntu.com security.ubuntu.com; do
+            if ! getent hosts "$host" >/dev/null; then
+              echo "::warning title=Paketquellen::$host nicht erreichbar – weiche auf mirrors.edge.kernel.org aus"
+              for f in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/*; do
+                [ -f "$f" ] && sudo sed -i -E 's#https?://(azure\.archive|archive|security)\.ubuntu\.com/ubuntu/?#http://mirrors.edge.kernel.org/ubuntu/#g' "$f"
+              done
+              break
+            fi
+          done
       - name: Systembibliotheken für Qt
         run: |
           sudo apt-get update
