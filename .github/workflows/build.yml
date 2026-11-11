@@ -19,6 +19,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Paketquellen – bei Netzfehlern wiederholen statt hängen
+        run: |
+          printf 'Acquire::Retries "5";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\nDPkg::Lock::Timeout "120";\n' \
+            | sudo tee /etc/apt/apt.conf.d/80-alupc-ci
       - name: Systembibliotheken für Qt
         run: |
           sudo apt-get update
@@ -40,7 +44,7 @@ jobs:
             exit 1; }
       - name: Ton echt – PulseAudio mit 2 Lautsprechern und 2 Mikrofonen (Gerät wählen, Pegel, stumm)
         run: |
-          sudo apt-get install -y pulseaudio pulseaudio-utils > /dev/null
+          sudo apt-get install -y pulseaudio pulseaudio-utils > /dev/null || { sudo apt-get update; sudo apt-get install -y pulseaudio pulseaudio-utils > /dev/null; }
           python tests/audio_linux_check.py 2>&1 | tee audio.log
           test "${PIPESTATUS[0]}" -eq 0 || { grep "✗" audio.log | sed 's/^/::error title=Ton (Linux)::/'; exit 1; }
           echo "::notice title=Ton (Linux)::$(tail -1 audio.log)"
@@ -84,7 +88,7 @@ jobs:
           retention-days: 7
       - name: Sprache echt – Piper spricht (auch über ein virtuelles Mikrofon), Vosk/Whisper hören, AluPC versteht
         run: |
-          sudo apt-get install -y pulseaudio pulseaudio-utils
+          sudo apt-get install -y pulseaudio pulseaudio-utils || { sudo apt-get update; sudo apt-get install -y pulseaudio pulseaudio-utils; }
           pulseaudio --check 2>/dev/null || pulseaudio -D --exit-idle-time=-1  # läuft schon vom Mischpult-Schritt
           sleep 1
           pactl load-module module-null-sink sink_name=virt
@@ -140,6 +144,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Paketquellen – bei Netzfehlern wiederholen statt hängen
+        run: |
+          printf 'Acquire::Retries "5";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\nDPkg::Lock::Timeout "120";\n' \
+            | sudo tee /etc/apt/apt.conf.d/80-alupc-ci
       - name: Systembibliotheken für Qt
         run: |
           sudo apt-get update
@@ -212,7 +220,7 @@ jobs:
           fi
       - name: Sprache in der fertigen Version – Piper spricht ins (virtuelle) Mikrofon, installiertes AluPC versteht
         run: |
-          sudo apt-get install -y pulseaudio pulseaudio-utils >/dev/null
+          sudo apt-get install -y pulseaudio pulseaudio-utils >/dev/null || { sudo apt-get update; sudo apt-get install -y pulseaudio pulseaudio-utils >/dev/null; }
           pulseaudio -D --exit-idle-time=-1
           sleep 1
           pactl load-module module-null-sink sink_name=virt >/dev/null
