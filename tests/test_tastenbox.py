@@ -173,8 +173,8 @@ def tastenbox_sketch_exists() -> bool:
     from alupc.ui.tastenbox_page import SKETCH
 
     text = SKETCH.read_text(encoding="utf-8")
-    return all(w in text for w in ("HALLO ALUPC-TASTEN 8", "DREI_FARBEN", "TON ", "BUZZER", "LAUT", "WERT", "TASTE", "LANG", "EFFEKT", "FARBE", "DEBUG", "ROH", "PIXEL",
-                                   "ARDUINO_AVR_LEONARDO"))
+    return all(w in text for w in ("HALLO ALUPC-TASTEN 9", "BELEGUNG", "SUCHE", "EEPROM", "TON ", "BUZZER", "LAUT", "WERT", "TASTE", "LANG", "EFFEKT", "FARBE", "DEBUG", "ROH", "PIXEL",
+                                   "__AVR_ATmega32U4__"))
 
 
 def test_audio_default_output_locked(env, monkeypatch):  # noqa: F811
@@ -539,7 +539,7 @@ def test_arduino_sketches_download(env, monkeypatch, tmp_path):  # noqa: F811
         assert out == tmp_path / name / f"{name}.ino" and out.exists()
         text = out.read_text(encoding="utf-8")
         assert "void setup()" in text and "void loop()" in text and "JTD" in text  # Pro Micro: JTAG aus
-    assert "DREI_FARBEN" in (tmp_path / "AluPC-Tasten" / "AluPC-Tasten.ino").read_text(encoding="utf-8")
+    assert "BELEGUNG" in (tmp_path / "AluPC-Tasten" / "AluPC-Tasten.ino").read_text(encoding="utf-8")
 
 
 def _rule(name, folge, ziel, **wenn):
@@ -844,3 +844,148 @@ def test_rule_with_several_actions(env, monkeypatch):  # noqa: F811
     monkeypatch.setattr(controller, "play_buzzer_song", lambda name: ran.append("buzzer:" + name))
     controller.run_rule(clean_rule(rule))
     assert ran == ["standbild", "buzzer:erfolg"]
+
+
+# ---------------------------------------------------------------- Belegung (Programm 9)
+def test_parse_pin_mapping_lines():
+    from alupc.tastenbox import parse_line
+
+    assert parse_line("BELEGUNG 2 3 4 5 6 7 8 14 15 10 9 16 18 20") == (
+        "belegung", (2, 3, 4, 5, 6, 7, 8, 14, 15, 10, 9, 16, 18, 20))
+    assert parse_line("BELEGUNG 2 3") is None
+    assert parse_line("PIN 9") == ("pin", 9)
+    assert parse_line("FEHLER BELEGUNG") == ("fehler", "belegung")
+
+
+def test_pins_problem_matches_firmware_rules():
+    from alupc.tastenbox import DEFAULT_PINS, pins_problem
+
+    for board, pins in DEFAULT_PINS.items():
+        assert pins_problem(board, pins) == ""
+    pm = list(DEFAULT_PINS["Pro Micro"])
+    assert "doppelt" in pins_problem("Pro Micro", pm[:10] + [10] + pm[11:])   # grün = rot
+    assert "Analog" in pins_problem("Pro Micro", pm[:12] + [0, 20])           # Regler an RX
+    assert "gibt es" in pins_problem("Pro Micro", [11] + pm[1:])              # Pin 11 hat der Pro Micro nicht
+    assert pins_problem("Pro Micro", pm[:3]) != ""
+
+
+def test_default_pins_match_sketch():
+    """Die Standard-Belegung der App ist dieselbe wie im Arduino-Programm (A0 = 18 bzw. 14)."""
+    import re
+
+    from alupc.tastenbox import DEFAULT_PINS
+
+    from alupc.ui.tastenbox_page import SKETCH
+
+    text = SKETCH.read_text(encoding="utf-8")
+    rows = re.findall(r"STANDARD\[14\] = \{(.*?)\};", text)
+    assert len(rows) == 2
+    for board, row, a0 in (("Pro Micro", rows[0], 18), ("Nano", rows[1], 14)):
+        row = re.sub(r"/\*.*?\*/", "", row)
+        pins = [a0 + int(p[1:]) if p.startswith("A") else int(p) for p in (x.strip() for x in row.split(","))]
+        assert pins == DEFAULT_PINS[board]
+
+
+def _mapped_box(version="9 PROMICRO"):
+    from alupc.tastenbox import DEFAULT_PINS, ButtonBox
+
+    box = ButtonBox()
+    sent = []
+    box.send = lambda line: sent.append(line) or True
+    box.port = "COM9"
+    box.feed(f"HALLO ALUPC-TASTEN {version}")
+    if version.startswith("9"):
+        box.feed("BELEGUNG " + " ".join(map(str, DEFAULT_PINS["Pro Micro"])))
+    return box, sent
+
+
+def test_box_reads_and_sends_mapping():
+    from alupc.tastenbox import DEFAULT_PINS
+
+    box, sent = _mapped_box()
+    assert box.can_map and box.pins == DEFAULT_PINS["Pro Micro"]
+    pins = list(box.pins)
+    pins[10], pins[9] = pins[9], pins[10]                     # rot und grün tauschen
+    assert box.set_pins(pins) and sent[-1] == "BELEGUNG 2 3 4 5 6 7 8 14 15 9 10 16 18 20"
+    assert not box.set_pins(pins[:9] + [9, 9, 16, 18, 20])    # doppelt: gar nicht erst schicken
+    assert box.test_pin(9) and sent[-1] == "PIN 9 1500"
+    assert box.search(True) and sent[-1] == "SUCHE 1" and box.searching
+    assert box.reset_pins() and sent[-1] == "BELEGUNG 0"
+    found = []
+    box.pin_found.connect(found.append)
+    box.feed("PIN 14")
+    assert found == [14]
+
+
+def test_old_box_cannot_map():
+    box, sent = _mapped_box("8 PROMICRO")
+    assert not box.can_map
+    assert not box.set_pins([2, 3, 4, 5, 6, 7, 8, 14, 15, 10, 9, 16, 18, 20])
+    assert not box.test_pin(9) and not box.search(True)
+    assert not any(line.startswith(("BELEGUNG ", "PIN", "SUCHE")) for line in sent)
+
+
+def _pins_page(env, version="9 PROMICRO"):  # noqa: F811
+    from alupc.tastenbox import DEFAULT_PINS
+    from alupc.ui.tastenbox_page import TastenboxPage
+
+    c, window, _ = env
+    window.open_setup_section("Tastenbox")
+    pump()
+    page = window.findChild(TastenboxPage)
+    bb = c.buttonbox
+    sent = []
+    bb.send = lambda line: sent.append(line) or True
+    bb.port = "COM9"
+    bb.feed(f"HALLO ALUPC-TASTEN {version}")
+    if version.startswith("9"):
+        bb.feed("BELEGUNG " + " ".join(map(str, DEFAULT_PINS["Pro Micro"])))
+    return c, page, sent
+
+
+def test_page_mapping_swap_and_send(env):  # noqa: F811
+    c, page, sent = _pins_page(env)
+    green, red = page.pin_combos[10], page.pin_combos[9]
+    assert green.isEnabled() and green.currentData() == 9 and not page.pin_apply.isEnabled()
+    assert page.pin_combos[12].findData(9) < 0                 # Regler: nur A-Pins zur Wahl
+    green.setCurrentIndex(green.findData(10))                  # grün auf den Pin von rot …
+    page._pin_picked(10)
+    assert red.currentData() == 9 and page.pin_apply.isEnabled()   # … rot tauscht automatisch
+    page._pin_test(10)
+    assert sent[-1] == "PIN 10 1500"
+    page._pins_send()
+    assert sent[-1] == "BELEGUNG 2 3 4 5 6 7 8 14 15 9 10 16 18 20"
+    c.buttonbox.feed(sent[-1])                                 # Box bestätigt
+    assert not page.pin_apply.isEnabled() and "Gespeichert" in page.pin_status.text()
+
+
+def test_page_learn_keys(env):  # noqa: F811
+    c, page, sent = _pins_page(env)
+    page._learn_start()
+    assert sent[-1] == "SUCHE 1" and "Taste 1" in page.pin_status.text()
+    order = [15, 14, 8, 7, 6, 5, 4, 3, 2]                      # Tasten genau andersherum verkabelt
+    for i, pin in enumerate(order):
+        c.buttonbox.feed(f"PIN {pin}")
+        c.buttonbox.feed(f"PIN {pin}")                         # prellen / doppelt: zählt nicht zweimal
+    assert page._learn is None
+    assert sent[-2] == "SUCHE 0"
+    assert sent[-1] == "BELEGUNG 15 14 8 7 6 5 4 3 2 10 9 16 18 20"
+
+
+def test_page_mapping_needs_program_9(env):  # noqa: F811
+    c, page, sent = _pins_page(env, "8 PROMICRO")
+    assert not page.pin_combos[0].isEnabled() and not page.learn_btn.isEnabled()
+    assert "ab Programm 9" in page.pin_status.text()
+
+
+def test_page_tabs_show_only_their_sections(env):  # noqa: F811
+    from alupc.ui.tastenbox_page import TABS
+
+    c, page, sent = _pins_page(env)
+    for index in range(len(TABS)):
+        page.tabs.setCurrentIndex(index)
+        shown = {tab for tab, w in page._sections if w.isVisible()}
+        assert shown == {index}
+    page._learn_start()
+    page.tabs.setCurrentIndex(0)                               # Reiter verlassen beendet das Anlernen
+    assert page._learn is None and sent[-1] == "SUCHE 0"

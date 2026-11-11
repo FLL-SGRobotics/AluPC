@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QSpinBox,
+    QTabBar,
     QVBoxLayout,
     QWidget,
 )
@@ -49,10 +50,11 @@ FILE_CHOICES = [("__klang__", "Klang-Datei am PC abspielen … (Datei wählen)")
 LED_HELP = (
     "<b>Wann:</b> wann die LEDs überhaupt leuchten. <b>Effekt:</b> ruhig = gleichmäßig, atmen = langsam heller und "
     "dunkler, blinken, Farbwechsel = läuft durch alle Farben. <b>Farbe:</b> mischt deine roten, grünen und blauen LEDs "
-    "in jeder Ecke – Rot = nur die roten (Pin 10), Grün = nur die grünen (Pin 9), Blau = nur die blauen (Pin 16), "
-    "Weiß = alle drei. <b>Farbschema</b> gilt nur für RGB-LED-Streifen (WS2812), nicht für einzelne LEDs.")
+    "in jeder Ecke – Rot = nur die roten, Grün = nur die grünen, Blau = nur die blauen, Weiß = alle drei. "
+    "Leuchtet eine Farbe nicht: Reiter <b>Belegung</b> → anderen Pin wählen und testen. <b>Farbschema</b> gilt nur für RGB-LED-Streifen (WS2812), nicht für einzelne LEDs.")
 QUICK_COLORS = [("Rot", "#ff0000"), ("Grün", "#00ff00"), ("Blau", "#0000ff"), ("Weiß", "#ffffff"),
                 ("Lila", "#ff00ff"), ("Gelb", "#ffff00"), ("Türkis", "#00ffff")]
+TABS = ["Tasten", "Licht und Ton", "Wenn → Dann", "Belegung", "Box und Hilfe"]
 CELL = 132  # 3 × 132 passt auch ins kleinste Fenster (600 px)
 
 
@@ -211,6 +213,14 @@ class TastenboxPage(QWidget):
         self.status = QLabel()
         self.status.setWordWrap(True)
         root.addWidget(self.status)
+        self.tabs = QTabBar()
+        self.tabs.setExpanding(False)
+        self.tabs.setDrawBase(False)
+        self.tabs.setUsesScrollButtons(True)
+        for name in TABS:
+            self.tabs.addTab(name)
+        root.addWidget(self.tabs)
+        self._sections: list[tuple[int, QWidget]] = []
         intro = QLabel(
             "<b>So geht's:</b> ① Eine Taste unten antippen (oder die echte Taste drücken) und wählen, was sie tun soll "
             "– kurz drücken und lang drücken (über 0,6 s) gehen getrennt. ② Beim Drehregler wählen, was er regelt. "
@@ -219,6 +229,7 @@ class TastenboxPage(QWidget):
         intro.setWordWrap(True)
         intro.setObjectName("Muted")
         root.addWidget(intro)
+        self._sections.append((0, intro))
         osd_row = QWidget()
         ol = FlowLayout(spacing=12)
         osd_row.setLayout(ol)
@@ -235,11 +246,13 @@ class TastenboxPage(QWidget):
         ol.addWidget(osd)
         ol.addWidget(osd_knob)
         root.addWidget(osd_row)
+        self._sections.append((0, osd_row))
 
         cols = FlowLayout(spacing=14)  # breit: Tasten links, Regler rechts – schmal: untereinander
         holder = QWidget()
         holder.setLayout(cols)
         root.addWidget(holder)
+        self._sections.append((0, holder))
 
         # ---- Tasten 3 × 3, wie auf der Box
         keys_box = QGroupBox("Tasten")
@@ -344,12 +357,13 @@ class TastenboxPage(QWidget):
         knob_box.setFixedWidth(320)
         cols.addWidget(knob_box)
 
-        root.addWidget(self._led_box())
-        root.addWidget(self._buzzer_box())
-        root.addWidget(self._rules_box())
-        root.addWidget(self._device_box())
-        root.addWidget(self._debug_box())
+        for tab, box in ((1, self._led_box()), (1, self._buzzer_box()), (2, self._rules_box()),
+                         (3, self._pins_box()), (4, self._device_box()), (4, self._debug_box())):
+            root.addWidget(box)
+            self._sections.append((tab, box))
         root.addStretch(1)
+        self.tabs.currentChanged.connect(self._show_tab)
+        self._show_tab(0)
 
         bb = c.buttonbox
         bb.state_changed.connect(self.refresh)
@@ -366,9 +380,220 @@ class TastenboxPage(QWidget):
         bb.raw.connect(self._raw)
         bb.log_line.connect(self._log)
         bb.state_changed.connect(self._debug_info)
+        bb.state_changed.connect(self._fill_pins)
+        bb.pins_changed.connect(self._pins_arrived)
+        bb.pins_refused.connect(lambda: self._pin_note("Die Box hat diese Belegung abgelehnt (Pin doppelt oder "
+                                                       "Regler nicht an einem A-Pin)."))
+        bb.pin_found.connect(self._pin_found)
         c.changed.connect(self.refresh)
         self.select(1)
         self.refresh()
+
+    def _show_tab(self, index: int) -> None:
+        """Nur die Abschnitte des gewählten Reiters zeigen (die Seite bleibt so kurz wie ihr Inhalt)."""
+        if index != 3 and getattr(self, "_learn", None) is not None:
+            self._learn_stop()
+        for tab, widget in self._sections:
+            widget.setVisible(tab == index)
+
+    def show_tab(self, name: str) -> None:
+        self.tabs.setCurrentIndex(TABS.index(name))
+
+    # ------------------------------------------------------------ Belegung (welcher Pin ist was)
+    def _pins_box(self) -> QGroupBox:
+        from ..tastenbox import PIN_ROLES
+
+        box = QGroupBox("Belegung – an welchem Pin hängt was")
+        lay = QVBoxLayout(box)
+        hint = QLabel(
+            "Hier stellst du ein, an welchem Pin des Arduino jede Taste, jede LED-Farbe, der Regler und der Buzzer "
+            "hängt. Die Box merkt sich das dauerhaft. <b>Leuchtet eine Farbe nicht:</b> anderen freien Pin wählen, "
+            "<b>Testen</b> drücken – leuchtet sie, das Kabel dort lassen und <b>An die Box senden</b>.")
+        hint.setWordWrap(True)
+        hint.setObjectName("Muted")
+        lay.addWidget(hint)
+        self.pin_status = QLabel()
+        self.pin_status.setWordWrap(True)
+        lay.addWidget(self.pin_status)
+        self.pin_combos: list[QComboBox] = []
+        self._pin_values: list[int] = []
+        self._learn: int | None = None
+
+        def combo(i: int) -> QComboBox:
+            cb = QComboBox()
+            cb.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+            cb.setMinimumContentsLength(3)  # 3 Spalten passen auch ins kleinste Fenster
+            cb.setToolTip(PIN_ROLES[i])
+            cb.activated.connect(lambda _x, i=i: self._pin_picked(i))
+            self.pin_combos.append(cb)
+            return cb
+
+        keys = QWidget()
+        grid = QGridLayout(keys)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(8)
+        for i in range(9):  # 3 × 3 wie auf der Box
+            cell = QVBoxLayout()  # Name über der Liste: 3 Spalten passen auch ins kleinste Fenster
+            cell.setSpacing(2)
+            label = QLabel(f"Taste {i + 1}")
+            label.setObjectName("Muted")
+            cell.addWidget(label)
+            cell.addWidget(combo(i))
+            grid.addLayout(cell, i // 3, i % 3)
+        lay.addWidget(keys)
+        self.learn_btn = button("Tasten anlernen", "grid")
+        self.learn_btn.setToolTip("Nacheinander Taste 1 bis 9 drücken – AluPC merkt sich, an welchem Pin jede hängt")
+        self.learn_btn.clicked.connect(lambda: self._learn_stop() if self._learn is not None else self._learn_start())
+        lay.addWidget(self.learn_btn, 0, Qt.AlignLeft)
+
+        form = QFormLayout()
+        self.pin_tests: list[QPushButton] = []
+        for i, name in ((9, "LEDs rot:"), (10, "LEDs grün:"), (11, "LEDs blau:")):
+            row = QHBoxLayout()
+            row.addWidget(combo(i), 1)
+            test = button("Testen", "sun")
+            test.setToolTip("Schaltet den gewählten Pin 1,5 Sekunden ein – leuchten die LEDs dieser Farbe?")
+            test.clicked.connect(lambda _c=False, i=i: self._pin_test(i))
+            self.pin_tests.append(test)
+            row.addWidget(test)
+            form.addRow(name, row)
+        form.addRow("Regler (Mitte):", combo(12))
+        form.addRow("Buzzer (+):", combo(13))
+        lay.addLayout(form)
+
+        row = QHBoxLayout()
+        self.pin_apply = button("An die Box senden", "check", primary=True)
+        self.pin_apply.clicked.connect(self._pins_send)
+        self.pin_default = button("Standard", "refresh")
+        self.pin_default.setToolTip("Zurück zur Belegung aus der Anleitung")
+        self.pin_default.clicked.connect(lambda: self.controller.buttonbox.reset_pins())
+        row.addWidget(self.pin_apply)
+        row.addWidget(self.pin_default)
+        row.addStretch(1)
+        lay.addLayout(row)
+        self._fill_pins()
+        return box
+
+    def _pin_note(self, text: str) -> None:
+        self.pin_status.setText(text)
+
+    def _fill_pins(self) -> None:
+        """Listen neu füllen: Pins des Boards, Stand der Box."""
+        from ..tastenbox import ANALOG_FROM, PINS_VERSION, board_pins
+
+        bb = self.controller.buttonbox
+        ok = bb.can_map and len(bb.pins) == 14
+        for w in (*self.pin_combos, *self.pin_tests, self.pin_apply, self.pin_default, self.learn_btn):
+            w.setEnabled(ok)
+        if not ok:
+            if self._learn is not None:
+                self._learn = None
+                self.learn_btn.setText("Tasten anlernen")
+            if not bb.connected:
+                self._pin_note("Keine Box verbunden.")
+            elif bb.version < PINS_VERSION:
+                self._pin_note(f"Die Box hat Programm {bb.version}. Die Belegung geht ab Programm {PINS_VERSION}: "
+                               "Reiter „Box und Hilfe“ → Tastenbox-Programm speichern und neu aufspielen.")
+            else:
+                self._pin_note("Frage die Box nach ihrer Belegung …")
+            return
+        names = board_pins(bb.board)
+        self._pin_values = list(bb.pins)
+        for i, cb in enumerate(self.pin_combos):
+            cb.blockSignals(True)
+            cb.clear()
+            for pin, name in names.items():
+                if i != 12 or pin >= ANALOG_FROM.get(bb.board, 18):
+                    cb.addItem(name, pin)
+            cb.setCurrentIndex(max(0, cb.findData(bb.pins[i])))
+            cb.blockSignals(False)
+        self.pin_apply.setEnabled(False)
+        self._pin_note(f"✓ Belegung der Box gelesen ({bb.board or 'Board'}).")
+
+    def _pins_arrived(self) -> None:
+        was_dirty = self.pin_apply.isEnabled()
+        self._fill_pins()
+        if was_dirty:
+            self._pin_note("✓ Gespeichert – die Box benutzt jetzt diese Belegung.")
+
+    def _pin_assign(self, i: int, pin: int) -> bool:
+        """Rolle i bekommt diesen Pin; hatte ihn schon eine andere Rolle, tauschen die beiden."""
+        from ..tastenbox import ANALOG_FROM, PIN_ROLES, pin_name
+
+        bb = self.controller.buttonbox
+        old = self._pin_values[i]
+        if pin == old:
+            return True
+        if i == 12 and pin < ANALOG_FROM.get(bb.board, 18):
+            return False
+        if pin in self._pin_values:
+            j = self._pin_values.index(pin)
+            if j == 12 and old < ANALOG_FROM.get(bb.board, 18):  # der Regler kann nicht auf einen Digital-Pin
+                self._pin_note(f"Pin {pin_name(bb.board, pin)} gehört dem Regler – erst dem Regler einen anderen "
+                               "A-Pin geben.")
+                self.pin_combos[i].setCurrentIndex(self.pin_combos[i].findData(old))
+                return False
+            self._pin_values[j] = old
+            self.pin_combos[j].setCurrentIndex(self.pin_combos[j].findData(old))
+            self._pin_note(f"Getauscht: {PIN_ROLES[j]} liegt jetzt auf {pin_name(bb.board, old)}. "
+                           "Noch nicht gespeichert.")
+        else:
+            self._pin_note("Geändert – noch nicht gespeichert.")
+        self._pin_values[i] = pin
+        self.pin_combos[i].setCurrentIndex(self.pin_combos[i].findData(pin))
+        self.pin_apply.setEnabled(True)
+        return True
+
+    def _pin_picked(self, i: int) -> None:
+        self._pin_assign(i, int(self.pin_combos[i].currentData()))
+
+    def _pin_test(self, i: int) -> None:
+        from ..tastenbox import pin_name
+
+        bb = self.controller.buttonbox
+        pin = self._pin_values[i]
+        if bb.test_pin(pin):
+            self._pin_note(f"Pin {pin_name(bb.board, pin)} ist 1,5 Sekunden an – leuchtet etwas?")
+
+    def _pins_send(self) -> None:
+        from ..tastenbox import pins_problem
+
+        bb = self.controller.buttonbox
+        problem = pins_problem(bb.board, self._pin_values)
+        if problem:
+            self._pin_note(problem)
+        elif not bb.set_pins(self._pin_values):
+            self._pin_note("Senden ging nicht – ist die Box verbunden?")
+
+    def _learn_start(self) -> None:
+        if not self.controller.buttonbox.search(True):
+            return
+        self._learn = 0
+        self.learn_btn.setText("Abbrechen")
+        self._pin_note("Drücke jetzt <b>Taste 1</b> auf der Box (oben links).")
+
+    def _learn_stop(self) -> None:
+        self._learn = None
+        self.learn_btn.setText("Tasten anlernen")
+        self.controller.buttonbox.search(False)
+
+    def _pin_found(self, pin: int) -> None:
+        from ..tastenbox import pin_name
+
+        bb = self.controller.buttonbox
+        if self._learn is None:
+            return
+        if pin in self._pin_values[:self._learn]:  # dieselbe Taste noch einmal (oder prellt)
+            return
+        if not self._pin_assign(self._learn, pin):
+            return
+        self._learn += 1
+        if self._learn >= 9:
+            self._learn_stop()
+            self._pins_send()
+            return
+        self._pin_note(f"Taste {self._learn} → Pin {pin_name(bb.board, pin)}. Drücke jetzt "
+                       f"<b>Taste {self._learn + 1}</b>.")
 
     # ------------------------------------------------------------ Speichern
     def _save(self, **changes) -> None:
@@ -575,7 +800,7 @@ class TastenboxPage(QWidget):
             what.setWordWrap(True)
             row.addWidget(what, 1)
             dl.addLayout(row)
-        wiring = QLabel("Anschlüsse Pro Micro: Tasten 2–8, 14, 15 · Regler-Mitte A0 · LEDs rot 10, grün 9, blau 16 · "
+        wiring = QLabel("Standard-Anschlüsse (umstellbar im Reiter „Belegung“) – Pro Micro: Tasten 2–8, 14, 15 · Regler-Mitte A0 · LEDs rot 10, grün 9, blau 16 · "
                         "Buzzer A2.  Nano: Tasten 2–10 · A0 · LEDs 11, 12, 13 · Buzzer A2.  Je Farbe ein "
                         "220-Ω-Widerstand für 4 LEDs · das andere Tasten-Bein und die kurzen LED-Beine an Minus (GND).")
         wiring.setObjectName("Muted")
@@ -871,7 +1096,7 @@ class TastenboxPage(QWidget):
                 cap.update()
 
     def _log(self, line: str) -> None:
-        if self.debug_body.isVisible():
+        if not self.debug_body.isHidden():  # auch wenn gerade ein anderer Reiter offen ist
             self.log_view.appendPlainText(line)
 
     def _debug_info(self) -> None:
@@ -966,7 +1191,13 @@ class TastenboxPage(QWidget):
             self.status.setText("Aus.")
         elif bb.connected:
             lock = " · PC-Lautstärke nur am Regler" if c.volume_locked() else ""
-            self.status.setText(f"✓ Verbunden ({bb.port}){lock}")
+            from ..tastenbox import PINS_VERSION
+
+            prog = f" · Programm {bb.version}" + (f" · {bb.board}" if bb.board else "")
+            old = ("" if bb.version >= PINS_VERSION else
+                   f"<br><b>Die Box hat ein älteres Programm.</b> Für Belegung und den neuen LED-Antrieb: Reiter "
+                   f"„Box und Hilfe“ → Tastenbox-Programm speichern und neu aufspielen (Programm {PINS_VERSION}).")
+            self.status.setText(f"✓ Verbunden ({bb.port}){prog}{lock}{old}")
         else:
             self.status.setText("Nicht gefunden – Box einstecken, AluPC sucht alle paar Sekunden.")
         labels = dict(self.choices)

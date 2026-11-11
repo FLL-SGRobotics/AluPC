@@ -156,8 +156,7 @@ türkis = grün + blau, alle drei ≈ weiß). Die 4 roten hängen an einem Pin, 
 | Code-Eingabe (Wenn → Dann) | blinkt | automatisch |
 | Regenbogen | alle Ecken laufen durch den Farbkreis | Effekt „Farbwechsel / Regenbogen“ |
 
-Helligkeit, Atmen, Blinken und der Blitz bei Tastendruck gehen wie bisher (Arduino-Programm 8, `#define DREI_FARBEN`
-ist an). Weiße LEDs gibt es nicht mehr – Weiß entsteht aus rot + grün + blau; Pin A1 ist frei.
+Helligkeit, Atmen, Blinken und der Blitz bei Tastendruck gehen wie bisher (Arduino-Programm 9). Weiße LEDs gibt es nicht mehr – Weiß entsteht aus rot + grün + blau; Pin A1 ist frei.
 
 ### Steckplan (Pro Micro auf dem Steckbrett, Reihe 1–12)
 
@@ -196,9 +195,22 @@ für Nano und Pro Micro). Es braucht einen Pro Micro mit 16 MHz (USB-C-Nachbaute
 
 ### Andere LEDs (alte Varianten)
 
-- **Alle LEDs an einem Pin** (nur an/aus/Helligkeit): im Programm `#define DREI_FARBEN` ausschalten (`//` davor),
-  alle Widerstände an D11 (Pro Micro D9).
-- **RGB-LEDs/Streifen (WS2812B, PL9823):** `DREI_FARBEN` aus, `#define STREIFEN n` an, DIN an D12 (Pro Micro D10).
+- **Alle LEDs an einem Pin** (nur an/aus/Helligkeit): alle Widerstände an den Pin für „LEDs rot“ und in AluPC
+  die Farbe Rot wählen.
+- **RGB-LEDs/Streifen (WS2812B, PL9823):** im Programm `#define STREIFEN n` einschalten (`//` weg), DIN an den Pin
+  für „LEDs rot“ (Pro Micro 10, Nano D11).
+
+## 5b. Eigene Belegung (ab Arduino-Programm 9)
+
+Die Tabelle in Abschnitt 0 ist nur der Standard. In AluPC, Seite **Tastenbox → Reiter „Belegung“**, lässt sich jeder
+Pin umstellen – die Box merkt es sich dauerhaft (auch ohne PC und nach Stromausfall):
+
+- **Tasten anlernen:** Knopf drücken, dann nacheinander Taste 1 bis 9 auf der Box – AluPC trägt die Pins selbst ein.
+- **Eine LED-Farbe leuchtet nicht:** Kabel dieser Farbe an einen freien Pin stecken (z. B. A1 oder A3), in der Liste
+  diesen Pin wählen, **Testen** (Pin ist 1,5 s an). Leuchtet sie → **An die Box senden**. Leuchtet sie an keinem Pin,
+  liegt es an Widerstand, LED-Richtung oder Minus-Leitung, nicht am Arduino.
+- Wählt man einen Pin, der schon vergeben ist, tauschen die beiden. Der Regler geht nur an A-Pins.
+- **Standard** stellt die Tabelle aus Abschnitt 0 wieder her.
 
 ## 6. Fehlersuche in AluPC
 

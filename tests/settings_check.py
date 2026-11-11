@@ -102,7 +102,7 @@ EXPECTED_BACK = {
     ("Sichern & Sync", "„An“", "sync.declined"): "„Aus“ geklickt = bewusst abgelehnt (vorher: nie gefragt)",
 }
 NO_CONFIG.update({"Darstellung: Swatch „AluPC“": "ist schon gewählt",
-                  "Darstellung: StyleCard „Ruhiges Dunkel für lange Abende“": "Stil Regie ist schon gewählt",
+                  "Darstellung: StyleCard „Mitternacht: Tintenblau und Türkis“": "Stil Regie ist schon gewählt",
                   "Darstellung: Swatch „Eigene Farbe“": "noch keine eigene Farbe → öffnet erst den Farbdialog",
                   "Töne: QComboBox": "„Eigener Ton …“ öffnet die Dateiauswahl (hier abgebrochen)",
                   "Allgemein: QCheckBox „Autostart“": "Autostart steht im System, nicht in der Konfiguration "

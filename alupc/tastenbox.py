@@ -54,9 +54,48 @@ DEFAULT_KEYS = {"1": "schwarz", "2": "standbild", "3": "studio_uebergang", "4": 
                 "9": "erweitern"}
 
 
+# Belegung (ab Programm 9): 14 Pins in dieser Reihenfolge – Tasten 1–9, LEDs rot/grün/blau, Regler, Buzzer
+PIN_ROLES = [f"Taste {n}" for n in range(1, 10)] + ["LEDs rot", "LEDs grün", "LEDs blau", "Regler", "Buzzer"]
+PINS_VERSION = 9
+# Pin-Nummern, wie sie die Box schickt → Aufdruck auf der Platine
+BOARD_PINS = {
+    "Pro Micro": {0: "RX (0)", 1: "TX (1)", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 7: "7", 8: "8", 9: "9", 10: "10",
+                  14: "14", 15: "15", 16: "16", 18: "A0", 19: "A1", 20: "A2", 21: "A3"},
+    "Nano": {2: "D2", 3: "D3", 4: "D4", 5: "D5", 6: "D6", 7: "D7", 8: "D8", 9: "D9", 10: "D10", 11: "D11",
+             12: "D12", 13: "D13", 14: "A0", 15: "A1", 16: "A2", 17: "A3", 18: "A4", 19: "A5"},
+}
+DEFAULT_PINS = {"Pro Micro": [2, 3, 4, 5, 6, 7, 8, 14, 15, 10, 9, 16, 18, 20],
+                "Nano": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16]}
+ANALOG_FROM = {"Pro Micro": 18, "Nano": 14}  # der Regler braucht einen Analog-Pin
+
+
+def board_pins(board: str) -> dict[int, str]:
+    return BOARD_PINS.get(board, BOARD_PINS["Pro Micro"])
+
+
+def pin_name(board: str, pin: int) -> str:
+    return board_pins(board).get(int(pin), str(pin))
+
+
+def pins_problem(board: str, pins: list[int]) -> str:
+    """Warum die Box diese Belegung ablehnen würde ("" = in Ordnung) – dieselbe Prüfung wie im Arduino-Programm."""
+    known = board_pins(board)
+    if len(pins) != len(PIN_ROLES):
+        return "Es müssen 14 Pins sein."
+    for i, pin in enumerate(pins):
+        if pin not in known:
+            return f"{PIN_ROLES[i]}: Pin {pin} gibt es auf dem {board or 'Board'} nicht."
+        if pin in pins[:i]:
+            return f"Pin {known[pin]} ist doppelt belegt ({PIN_ROLES[pins.index(pin)]} und {PIN_ROLES[i]})."
+    if pins[12] < ANALOG_FROM.get(board, 18):
+        return "Der Regler braucht einen Analog-Pin (A0 …)."
+    return ""
+
+
 def parse_line(line: str) -> tuple[str, int | str | None] | None:
     """Eine Zeile der Box → ("taste", 3) / ("laut", 57) / ("stumm", None) / ("hallo", "3 NANO") /
-    ("roh", ("010000000", 512)) / ("wert", 250) – sonst None."""
+    ("roh", ("010000000", 512)) / ("wert", 250) / ("belegung", (2, 3, …)) / ("pin", 9) / ("fehler", "belegung")
+    – sonst None."""
     text = line.strip().upper()
     if not text:
         return None
@@ -74,6 +113,12 @@ def parse_line(line: str) -> tuple[str, int | str | None] | None:
         return "roh", (parts[1], min(1023, int(parts[2])))
     if parts[0] == "WERT" and len(parts) == 2 and parts[1].isdigit():
         return "wert", min(999, int(parts[1]))
+    if parts[0] == "BELEGUNG" and len(parts) == 15 and all(p.isdigit() for p in parts[1:]):
+        return "belegung", tuple(int(p) for p in parts[1:])
+    if parts[0] == "PIN" and len(parts) == 2 and parts[1].isdigit():
+        return "pin", int(parts[1])
+    if parts == ["FEHLER", "BELEGUNG"]:
+        return "fehler", "belegung"
     return None
 
 
@@ -129,6 +174,9 @@ class ButtonBox(QObject):
     state_changed = Signal()   # verbunden/getrennt
     raw = Signal(str, int)     # Fehlersuche: Tasten "010000000" und Regler roh 0–1023
     log_line = Signal(str)     # Fehlersuche: jede Zeile hin und zurück, Suche, Fehler
+    pins_changed = Signal()    # Belegung der Box gelesen oder umgestellt (ab Programm 9)
+    pins_refused = Signal()    # die Box hat eine Belegung abgelehnt
+    pin_found = Signal(int)    # Pin-Suche: dieser Pin wurde gerade mit GND verbunden
     _line = Signal(str)
     _connected = Signal(str)
     _log = Signal(str)
@@ -145,6 +193,8 @@ class ButtonBox(QObject):
         self.raw_keys = ""      # nur mit Fehlersuche (DEBUG 1)
         self.raw_knob: int | None = None
         self.debug = False
+        self.pins: list[int] = []  # Belegung der Box (leer: unbekannt / älteres Programm)
+        self.searching = False
         self.log: collections.deque[str] = collections.deque(maxlen=300)
         self._silent: set[str] = set()  # USB-Seriell-Anschlüsse ohne Antwort (bis sie abgezogen werden)
         self._stop = threading.Event()
@@ -232,6 +282,32 @@ class ButtonBox(QObject):
         if self.connected:
             self.send(f"DEBUG {1 if on else 0}")
 
+    # ------------------------------------------------------------ Belegung (ab Programm 9)
+    @property
+    def can_map(self) -> bool:
+        return self.connected and self.version >= PINS_VERSION
+
+    def set_pins(self, pins: list[int]) -> bool:
+        """Belegung an die Box schicken – sie prüft, speichert dauerhaft und antwortet mit „BELEGUNG …“."""
+        if not self.can_map or pins_problem(self.board, list(pins)):
+            return False
+        return self.send("BELEGUNG " + " ".join(str(int(p)) for p in pins))
+
+    def reset_pins(self) -> bool:
+        return self.can_map and self.send("BELEGUNG 0")
+
+    def search(self, on: bool) -> bool:
+        """Pin-Suche: Die Box meldet jeden Pin, der mit GND verbunden wird (Tasten und Regler ruhen solange)."""
+        if not self.can_map:
+            self.searching = False
+            return False
+        self.searching = bool(on)
+        return self.send(f"SUCHE {1 if on else 0}")
+
+    def test_pin(self, pin: int, ms: int = 1500) -> bool:
+        """Einen Pin kurz einschalten – welche LED hängt daran?"""
+        return self.can_map and self.send(f"PIN {int(pin)} {max(50, min(5000, int(ms)))}")
+
     def _add_log(self, text: str) -> None:
         self.log.append(time.strftime("%H:%M:%S ") + text)
         self.log_line.emit(self.log[-1])
@@ -286,7 +362,7 @@ class ButtonBox(QObject):
                 self._stop.wait(3.0)  # in 3 s wieder suchen (Box später eingesteckt)
                 continue
             try:
-                ser.write(b"LAUT?\nWERT?\n")
+                ser.write(b"SUCHE 0\nBELEGUNG?\nLAUT?\nWERT?\n")  # ältere Programme überlesen die ersten zwei
                 if self.debug:
                     ser.write(b"DEBUG 1\n")
                 while not self._stop.is_set():
@@ -311,6 +387,7 @@ class ButtonBox(QObject):
         else:
             self.knob = self.fine_value = None
             self.version, self.board, self.raw_keys, self.raw_knob = 0, "", "", None
+            self.pins, self.searching = [], False
         self.state_changed.emit()
 
     def _handle(self, line: str) -> None:
@@ -342,8 +419,18 @@ class ButtonBox(QObject):
         elif kind == "roh":
             self.raw_keys, self.raw_knob = value
             self.raw.emit(*value)
+        elif kind == "belegung":
+            self.pins = list(value)
+            self.pins_changed.emit()
+        elif kind == "pin":
+            self.pin_found.emit(int(value))
+        elif kind == "fehler":
+            self.pins_refused.emit()
         elif kind == "hallo":  # Nano nach Neustart (z. B. Reset-Knopf): Version merken
             self.version, self.board = hello_info(str(value))
+            self.searching = False
+            if self.version >= PINS_VERSION:
+                self.send("BELEGUNG?")
             self.state_changed.emit()
 
 

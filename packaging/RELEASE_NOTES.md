@@ -9,6 +9,18 @@
 | Linux (x86_64) | `AluPC-linux-x86_64-….tar.gz` | ohne Installation: entpacken, `AluPC/AluPC` starten |
 | Kubuntu / Ubuntu | `AluPC-installieren.sh` | installiert die .deb daneben (oder lädt sie), wartet auf laufende Updates |
 
+### Neu in 2.6.0 – Tastenbox: neues Arduino-Programm, eigene Belegung, Seite mit Reitern
+- **Arduino-Programm 9 (bitte neu aufspielen):** komplett überarbeitet. Die LEDs werden jetzt direkt am Anschluss
+  geschaltet (64 Helligkeitsstufen an jedem Pin), Befehle werden ohne Speicher-Zerstückelung gelesen.
+- **Eigene Belegung:** Reiter „Belegung“ – für jede Taste, jede LED-Farbe, Regler und Buzzer den Pin wählen.
+  „Tasten anlernen“ (Taste 1–9 nacheinander drücken) und „Testen“ je LED-Farbe (Pin 1,5 s an). Die Box merkt sich
+  die Belegung dauerhaft. **Grüne LEDs leuchten nicht?** Kabel an einen freien Pin, dort testen, senden.
+- **Seite Tastenbox mit Reitern:** Tasten und Regler · Licht und Ton · Wenn → Dann · Belegung · Box und Hilfe –
+  statt einer langen Seite. Oben steht jetzt auch Programmversion und Board der Box.
+- Geprüft: Das Programm läuft für den Nano im Simulator durch alle Funktionen (LED-Farben, Dimmen, Effekte, Tasten
+  kurz/lang, Regler, Buzzer, Suche, Pin-Test, Belegung speichern/Neustart) – 47 Prüfungen bestanden. Für den
+  Pro Micro nur kompiliert (USB lässt sich hier nicht simulieren). Nicht auf echter Hardware getestet.
+
 ### Neu in 2.5.0 – Alle fünf Designs neu, flüssiger, aufgeräumt
 - **Alle Stile neu gestaltet:** Normal „Glas“ (tiefes Blaugrau, feine Lichtkanten, Indigo-Violett-Verlauf am
   Hauptknopf), Technisch „Pult“ (Graphit bzw. Aluminium, Tasten mit Kante, Signal-Orange), Holz (Furnier bleibt,
