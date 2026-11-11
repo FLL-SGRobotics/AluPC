@@ -17,7 +17,7 @@ import math
 import time
 import uuid
 
-from PySide6.QtCore import QPointF, QRect, QRectF, QSizeF, Qt, QTimer
+from PySide6.QtCore import QPointF, QRectF, QSizeF, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QFontMetricsF, QImage, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QWidget
 
@@ -844,5 +844,3 @@ def draw_into(controller, image: QImage) -> None:
     p.end()
 
 
-def item_rect(item: dict, w: float, h: float, data: OverlayData) -> QRect:
-    return place(item, w, h, measure(item, w, h, data)).toAlignedRect()

@@ -100,13 +100,15 @@ class KeyCap(QWidget):
         rad = {"normal": 14, "holz": 6}.get(t.style, 4) * t.radius_scale
         accent = QColor(t.accent)
         # Tastenkappe: etwas heller oben (wie eine echte Taste), Rand, beim Drücken Leuchten in Akzentfarbe
-        base = QColor(t.surface2)
+        from PySide6.QtGui import QLinearGradient
+
+        shade = QLinearGradient(r.topLeft(), r.bottomLeft())  # weicher Verlauf statt hartem hellen Block
+        shade.setColorAt(0, t.mix(t.surface2, "#ffffff", 0.07 if t.dark else 0.6))
+        shade.setColorAt(1, QColor(t.surface2))
         p.setPen(QPen(QColor(t.border), 1.2))
-        p.setBrush(base)
+        p.setBrush(shade)
         p.drawRoundedRect(r, rad, rad)
         p.setPen(Qt.NoPen)
-        p.setBrush(QColor(255, 255, 255, 14 if t.dark else 60))
-        p.drawRoundedRect(r.adjusted(4, 4, -4, -r.height() * 0.5), rad * 0.7, rad * 0.7)
         if self.selected:
             p.setPen(QPen(accent, 2))
             p.setBrush(Qt.NoBrush)

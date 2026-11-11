@@ -507,11 +507,6 @@ class _QuietServer(ThreadingHTTPServer):
         super().handle_error(request, client_address)
 
 
-class _ExclusiveServer(_QuietServer):
-    """Port für sich allein (Windows: sonst könnte ein anderes Programm mitlauschen)."""
-    allow_reuse_address = False
-
-
 DRAW_TOOLS = ("stift", "marker", "radierer", "pen", "eraser", "lasso", "line", "arrow", "rect", "ellipse", "laser")
 BOARD_OPS = ("zoom_in", "zoom_out", "fit", "seite_neu", "seite_vor", "seite_zurueck", "seite_loeschen",
              "rueckgaengig", "wiederholen", "leeren", "auswahl_loeschen", "hintergrund", "seite", "tafel_neu",

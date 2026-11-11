@@ -124,11 +124,6 @@ def _pa_modules(run=None) -> list[dict]:
     return mods
 
 
-def _pa_has(kind: str, name: str, run=_run) -> bool:
-    return any(d["id"] == name for d in _pa_devices(kind, run)) or \
-        any(str(d.get("name")) == name for d in _pa_json("sinks" if kind == "out" else "sources", run))
-
-
 def _pa_load(args: list[str], run=_run) -> tuple[bool, str]:
     code, out = run(["pactl", "load-module", *args])
     return code == 0, out.strip()

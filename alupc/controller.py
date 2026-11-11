@@ -1025,7 +1025,7 @@ class Controller(QObject):
             "resume": ({"title": self.resume_offer["title"], "pos": self.resume_offer["pos"] // 1000}
                        if self.resume_offer else None),
             "vid": self.video_info(),
-            "audio": __import__("alupc.audio", fromlist=["state"]).state(),
+            "audio": __import__("alupc.audio", fromlist=["cached_state"]).cached_state(),  # nie blockierend
             "recent": [{k: r[k] for k in ("title", "pos", "dur")} for r in self.recent_videos()],
             "timer": clock.text(),
             "keys": __import__("alupc.platform.keys", fromlist=["available"]).available(),

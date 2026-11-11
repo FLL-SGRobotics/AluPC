@@ -76,8 +76,8 @@ def test_alupc_theme_same_everywhere_and_branded(qapp):
         la, lb = sorted((lum(a), lum(b)), reverse=True)
         return (la + 0.05) / (lb + 0.05)
 
-    hues = {"normal": (215, 235), "technisch": (40, 55), "holz": (30, 45), "matrix": (135, 150),
-            "regie": (195, 210)}  # Blau / Signalgelb / Messing / Grün / Regie-Blau
+    hues = {"normal": (225, 245), "technisch": (20, 35), "holz": (20, 35), "matrix": (135, 150),
+            "regie": (165, 180)}  # Indigo / Signal-Orange / Kupfer / Grün / Türkis (Neugestaltung 2.5)
     for style in theme.STYLES:
         for mode in ("hell", "dunkel"):
             for wood in (theme.WOODS if style == "holz" else [theme.DEFAULT_WOOD]):
@@ -157,17 +157,17 @@ def test_dark_is_default_and_old_system_default_migrates(tmp_path):
 
 
 def test_regie_style_rules(qapp):  # noqa: D103
-    """Regie (taste-skill „Data terminal“ + awesome-design Raycast): nur dunkel, Flächenleiter Grund < Karte <
-    gehoben, keine Verläufe im Stylesheet, Auswahl als 1-px-Linie in der Akzentfarbe, Inter mit ss03."""
+    """Regie „Mitternacht“: nur dunkel, Flächenleiter Grund < Karte < gehoben, keine Verläufe im Stylesheet,
+    Auswahl in der Akzentfarbe (Linie links, zarter Grund), Hauptknopf in Akzentfarbe, Inter mit ss03."""
     from PySide6.QtGui import QColor, QFont
 
     t = theme.make_theme("hell", "alupc", "regie")
     assert t.dark and t.regie and t.kind == "regie" and t.head_font == "Inter"
     assert QColor(t.bg).lightness() < QColor(t.surface).lightness() < QColor(t.surface2).lightness()
     css = theme.stylesheet(t)
-    regie_part = css[css.index("#Sidebar {{ background: {}".format(t.bg).replace("{{", "{")):]
-    assert "gradient" not in regie_part
-    assert f"border-bottom: 1px solid {t.accent}" in regie_part and f"border-left: 1px solid {t.accent}" in regie_part
+    assert "gradient" not in css  # ruhig: keine Verläufe
+    assert f"border-left: 2px solid {t.accent}" in css
+    assert f'QPushButton[primary="true"] {{ background: {t.accent};' in css
     from pathlib import Path
 
     fonts = Path(theme.__file__).resolve().parent.parent / "assets" / "fonts"

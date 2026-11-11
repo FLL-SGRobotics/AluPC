@@ -311,17 +311,6 @@ def kwin_window_props(caption: str, below: bool = False, above: bool = False,
         return False
 
 
-def kwin_activate(internal_id: str) -> bool:
-    """KDE/Wayland: Fenster (KWin-Kennung) nach vorne holen – wmctrl geht dort nicht."""
-    if not dbus_util.HAVE_JEEPNEY:
-        return False
-    try:
-        run_kwin_script(ACTIVATE_SCRIPT % {"id": json.dumps(str(internal_id))})
-        return True
-    except Exception:  # noqa: BLE001
-        return False
-
-
 def _x_ignore(display, event) -> int:
     return 0
 
@@ -334,47 +323,3 @@ except (ImportError, AttributeError):  # pragma: no cover
     _X_IGNORE = None
 
 
-def set_x11_strut(win_id: int, bottom: int, start_x: int, end_x: int) -> bool:
-    """X11: am unteren Rand Platz für ein Fenster (Taskleiste) reservieren – maximierte Fenster bleiben darüber.
-    `bottom` zählt vom unteren Rand des ganzen (Mehr-Monitor-)Bildschirms. Geht auch unter KDE/Wayland, wenn AluPC
-    über XWayland läuft (KWin hält dann für maximierte Programme Platz frei)."""
-    from PySide6.QtGui import QGuiApplication
-
-    if QGuiApplication.platformName() != "xcb":
-        return False
-    import ctypes
-    import ctypes.util
-
-    name = ctypes.util.find_library("X11")
-    if not name:
-        return False
-    try:
-        x = ctypes.CDLL(name)
-        x.XOpenDisplay.restype = ctypes.c_void_p
-        x.XOpenDisplay.argtypes = [ctypes.c_char_p]
-        x.XInternAtom.restype = ctypes.c_ulong
-        x.XInternAtom.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
-        x.XChangeProperty.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_int,
-                                      ctypes.c_int, ctypes.c_void_p, ctypes.c_int]
-        x.XSync.argtypes = [ctypes.c_void_p, ctypes.c_int]
-        x.XCloseDisplay.argtypes = [ctypes.c_void_p]
-        x.XSetErrorHandler.restype = ctypes.c_void_p
-        x.XSetErrorHandler.argtypes = [ctypes.c_void_p]
-        dpy = x.XOpenDisplay(None)
-        if not dpy:
-            return False
-        # X-Fehler (z. B. ungültiges Fenster) beenden sonst den ganzen Prozess – hier nur ignorieren
-        old = x.XSetErrorHandler(ctypes.cast(_X_IGNORE, ctypes.c_void_p))
-        try:
-            partial = (ctypes.c_long * 12)(0, 0, 0, bottom, 0, 0, 0, 0, 0, 0, start_x, end_x)
-            simple = (ctypes.c_long * 4)(0, 0, 0, bottom)
-            for atom_name, data, n in ((b"_NET_WM_STRUT_PARTIAL", partial, 12), (b"_NET_WM_STRUT", simple, 4)):
-                atom = x.XInternAtom(dpy, atom_name, 0)
-                x.XChangeProperty(dpy, int(win_id), atom, 6, 32, 0, ctypes.cast(data, ctypes.c_void_p), n)  # CARDINAL
-            x.XSync(dpy, 0)
-        finally:
-            x.XCloseDisplay(dpy)
-            x.XSetErrorHandler(old)
-        return True
-    except (OSError, AttributeError, TypeError, ValueError):
-        return False

@@ -11,7 +11,7 @@ from __future__ import annotations
 import time
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QFontMetricsF, QLinearGradient, QPainter, QRadialGradient
+from PySide6.QtGui import QColor, QFont, QPainter, QRadialGradient
 
 LOOKS = {"buehne": "Bühne (dunkler Verlauf)", "schwarz": "Reines Schwarz"}
 BG_TOP = "#16181e"
@@ -28,11 +28,6 @@ settings = {"look": "buehne"}  # setzt der Controller aus config["output"]["stag
 
 def configure(look: str | None) -> None:
     settings["look"] = look if look in LOOKS else "buehne"
-
-
-def base_color() -> QColor:
-    """Eine Farbe für Stellen, die keinen Verlauf malen können."""
-    return QColor("#000000" if settings["look"] == "schwarz" else BG_BOTTOM)
 
 
 def paint_background(p: QPainter, rect: QRectF) -> None:
@@ -87,23 +82,6 @@ def _paint_aurora(p: QPainter, rect: QRectF, color: QColor, strength: float = 1.
     sat = color.hsvSaturationF()
     p.fillRect(rect, QColor.fromHsvF(hue, min(0.7, sat * 0.75), 0.16 if sat > 0.15 else 0.08))
     return
-    rect = QRectF(rect)
-    w, h = rect.width(), rect.height()
-    hue = color.hsvHueF() if color.hsvHueF() >= 0 else 0.62
-    base = QLinearGradient(rect.topLeft(), rect.bottomRight())
-    base.setColorAt(0, QColor.fromHsvF(hue, 0.55, 0.13))
-    base.setColorAt(1, QColor.fromHsvF((hue + 0.04) % 1.0, 0.6, 0.045))
-    p.fillRect(rect, base)
-    drift = 0.0
-    big = max(w, h)
-    _blob(p, rect, QPointF(rect.left() + w * (0.18 + drift), rect.top() + h * 0.05), big * 0.75, color, 0.42 * strength)
-    other = QColor.fromHsvF((hue + 0.09) % 1.0, min(1.0, max(0.5, color.hsvSaturationF())), 0.95)
-    _blob(p, rect, QPointF(rect.left() + w * (0.92 - drift), rect.top() + h * 1.02), big * 0.65, other,
-          0.30 * strength)
-    vignette = QRadialGradient(rect.center(), big * 0.72)
-    vignette.setColorAt(0.55, QColor(0, 0, 0, 0))
-    vignette.setColorAt(1, QColor(0, 0, 0, 150))
-    p.fillRect(rect, vignette)
 
 
 def font(px: float, weight: int = 700) -> QFont:
@@ -120,21 +98,6 @@ def eyebrow(p: QPainter, x: float, y: float, text: str, color: QColor, unit: flo
     """Früher ein kleines Etikett oben links. Ab 2.2 (taste-skill: „keine Etiketten über Überschriften“) zeichnet
     es nichts mehr; das Rechteck bleibt für den Aufbau."""
     return QRectF(x, y, 0, unit * 4)
-    f = font(unit * 1.9, 700)
-    f.setLetterSpacing(QFont.PercentageSpacing, 104)
-    tw = QFontMetricsF(f).horizontalAdvance(text)
-    r = QRectF(x, y, tw + unit * 5.2, unit * 4)
-    p.save()
-    p.setPen(Qt.NoPen)
-    p.setBrush(QColor(255, 255, 255, 22))
-    p.drawRoundedRect(r, r.height() / 2, r.height() / 2)
-    p.setBrush(color)
-    p.drawEllipse(QPointF(r.left() + unit * 2, r.center().y()), unit * 0.75, unit * 0.75)
-    p.setPen(QColor(255, 255, 255, 225))
-    p.setFont(f)
-    p.drawText(r.adjusted(unit * 3.4, 0, 0, 0), Qt.AlignLeft | Qt.AlignVCenter, text)
-    p.restore()
-    return r
 
 
 HIDE_CLOCK = False  # Info-Leiste zeigt schon die Uhr (screens_bar) → oben rechts keine zweite

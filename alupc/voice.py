@@ -161,10 +161,6 @@ def _alupc_score(joined: str) -> float:
     return max(difflib.SequenceMatcher(None, joined, form).ratio() for form in ALUPC_FORMS)
 
 
-def _is_alupc(joined: str) -> bool:
-    return _alupc_score(joined) >= 0.82
-
-
 def wake_span(words: list[str], wakes=("monitor", "alupc")) -> tuple[int, int] | None:
     """(Anfang, Ende) des LETZTEN Startworts im Satz – oder None, wenn keins vorkommt."""
     span = None

@@ -105,3 +105,17 @@ Der PC liefert die Seite mit seinen Farben, Rundungen, Schriften und (Holz) den 
 ## Verworfen
 
 „Regiepult“ (1.1), „Kontrollzentrum“ (zu bunt) und „Signal“ (zu viel Fachjargon: CH/PGM/STBY, Timecode).
+
+## Neugestaltung 2.5 (gilt vor allem Älteren in dieser Datei)
+
+Alle fünf Stile wurden neu gestaltet; Farben und Regeln stehen in `alupc/ui/theme.py` (`_make_theme`, `_stylesheet`):
+
+| Stil | Leitidee | Akzent | Form |
+|---|---|---|---|
+| Normal „Glas“ | tiefes Blaugrau, Flächen mit heller Oberkante, Verlauf nur am Hauptknopf | Indigo → Violett | rund (16/11) |
+| Technisch „Pult“ | Graphit bzw. Aluminium, Tasten mit dunkler Unterkante wie an einem Gerät | Signal-Orange | kantig (6/5) |
+| Holz | Furnier bleibt, Karten mit Kupferkante unten | Kupfer | 10/8 |
+| Matrix „Terminal“ | reines Schwarz, gestrichelte Rahmen, Auswahl = umgekehrte Farben | Phosphorgrün | eckig (0) |
+| Regie „Mitternacht“ | Tintenblau, Pillen-Knöpfe, keine Verläufe | Türkis | 14/18 |
+
+Rot bleibt in allen Stilen „läuft gerade auf dem Bildschirm“.

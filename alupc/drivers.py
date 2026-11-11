@@ -204,15 +204,6 @@ def vcam_installed() -> tuple[bool, str]:
     return False, "v4l2loopback fehlt – „Einrichten“ installiert es (einmal Administrator-Passwort)."
 
 
-def vbcable_installed() -> bool:
-    if not IS_WINDOWS:
-        return True
-    from . import mixer
-
-    st = mixer.virtual_status()
-    return bool(st["out"] and st["mic"])
-
-
 # --------------------------------------------------------------------------- Installieren
 def encoded_command(script: str) -> str:
     """PowerShell -EncodedCommand für ein langes Skript: gzip-komprimiert und im Zielprozess entpackt – sonst wird die

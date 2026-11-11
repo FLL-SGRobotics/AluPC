@@ -37,11 +37,11 @@ PROFILE_KEYS = ("style", "mode", "wood", "accent", "accent_color", "radius", "fo
 MODES = {"system": "Wie das System", "dunkel": "Dunkel", "hell": "Hell"}
 # Drei Gestaltungen (docs/DESIGN.md), frei umschaltbar unter Setup → Darstellung
 STYLES = {"normal": "Normal", "technisch": "Technisch", "holz": "Holz", "matrix": "Matrix", "regie": "Regie"}
-STYLE_INFO = {"normal": "Modern, weich und rund",
-              "technisch": "Dicht, mit Messwerten",
-              "holz": "Echtes Furnier, 7 Holzarten",
-              "matrix": "Grüner Code auf Schwarz",
-              "regie": "Ruhiges Dunkel für lange Abende"}
+STYLE_INFO = {"normal": "Glas: weiche Flächen, Indigo-Verlauf",
+              "technisch": "Pult: Tasten mit Kante, Signal-Orange",
+              "holz": "Echtes Furnier mit Kupfer, 7 Holzarten",
+              "matrix": "Terminal: Grün auf Schwarz, eckig",
+              "regie": "Mitternacht: Tintenblau und Türkis"}
 # Anzeigen auf Monitor 2 (Abstimmung, Glücksrad, Codes …): ruhiger, dunkler Grund
 STAGE_BG = "#121315"
 STAGE_PANEL = "#1c1d20"
@@ -114,7 +114,11 @@ class Theme:
     @property
     def radii(self) -> tuple[int, int, int, int]:
         """Rundung: Karte, Knopf, Eingabefeld, Listenzeile."""
-        base = {"technisch": (3, 3, 2, 2), "holz": (6, 5, 4, 4), "regie": (10, 8, 8, 6)}.get(self.kind, (20, 17, 12, 10))
+        if self.matrix:
+            base = (0, 0, 0, 0)  # Terminal: alles eckig
+        else:
+            base = {"technisch": (6, 5, 4, 3), "holz": (10, 8, 6, 5), "regie": (14, 18, 10, 8)}.get(
+                self.kind, (16, 11, 10, 8))
         return tuple(max(0, round(r * self.radius_scale)) for r in base)
 
     def pt(self, size: float) -> float:
@@ -273,12 +277,6 @@ def system_accent() -> str:
     return c.name()
 
 
-def from_appearance(a: dict) -> Theme:
-    """Theme aus den gespeicherten Einstellungen (appearance) – inkl. eigener Farbe, Rundung, Schrift, Abständen."""
-    return make_theme(a.get("mode", "system"), a.get("accent", "alupc"), a.get("style", "normal"),
-                      a.get("wood", DEFAULT_WOOD), custom=a)
-
-
 def make_theme(mode: str = "system", accent: str = "blau", style: str = "normal", wood: str = "nussbaum",
                custom: dict | None = None) -> Theme:
     t = _make_theme(mode, accent, style, wood, custom or {})
@@ -298,47 +296,57 @@ def _make_theme(mode: str, accent: str, style: str, wood: str, custom: dict) -> 
     wood = wood if wood in WOODS else DEFAULT_WOOD
     dark = WOODS[wood][5] if style == "holz" else (system_prefers_dark() if mode == "system" else mode == "dunkel")
     key = accent if accent in ACCENTS else "alupc"
-    own = {"normal": ("#5b8cff", "#2f62e9"), "technisch": ("#f5c400", "#c99a00"),
-           "holz": ("#e0b354", "#8a5a12"), "matrix": ("#00ff66", "#00ff66"), "regie": ("#57c1ff", "#57c1ff")}[style]
+    # Eigene Akzentfarbe je Stil (dunkel, hell) und Partnerfarbe für Verläufe – Neugestaltung 2.5:
+    # Normal „Glas“ (Indigo → Violett), Technisch „Pult“ (Signal-Orange), Holz (Kupfer),
+    # Matrix „Terminal“ (Phosphorgrün), Regie „Mitternacht“ (Türkis auf Tintenblau)
+    own = {"normal": ("#7c8cff", "#4f5bd5"), "technisch": ("#ff8a1f", "#d96a00"),
+           "holz": ("#e8a05c", "#9a4f17"), "matrix": ("#39ff88", "#39ff88"), "regie": ("#2dd4bf", "#2dd4bf")}[style]
+    partner = {"normal": ("#c084fc", "#8b5cf6"), "technisch": ("#ffb347", "#ff8a1f"),
+               "holz": ("#f3c98b", "#c9792f"), "matrix": ("#b6ff5c", "#b6ff5c"), "regie": ("#60a5fa", "#60a5fa")}[style]
     if style in ("matrix", "regie"):
         dark = True  # Matrix und Regie gibt es nur dunkel
+    accent2 = ""
     if key == "alupc":
         accent_hex = own[0] if dark else own[1]
+        accent2 = partner[0] if dark else partner[1]
     elif key == "system":
         accent_hex = system_accent()
     elif key == "eigen":
         accent_hex = QColor(custom.get("accent_color") or ACCENTS["eigen"][1]).name()
     else:
         accent_hex = ACCENTS[key][1]
-    if style == "matrix":  # Phosphorgrün auf Schwarz
-        return Theme(True, accent_hex, bg="#010403", surface="#04110a", surface2="#082016", border="#0f3a22",
-                     text="#c8ffd8", muted="#6fd394", danger="#ff5c5c", live="#ff3b3b", ready="#00ff66",
-                     style=style)
-    if style == "regie":  # Flächenleiter, Haarlinie und Textstufen aus awesome-design (Raycast)
-        return Theme(True, accent_hex, bg="#07080a", surface="#0d0d0d", surface2="#121212", border="#242728",
-                     text="#f4f4f6", muted="#9c9c9d", danger="#ff6161", warning="#ffc533", success="#59d499",
-                     live="#ff6161", ready="#59d499", style=style)
-    if style == "technisch":
+    if style == "matrix":  # Terminal: Phosphorgrün auf reinem Schwarz, Bernstein für Warnungen
+        return Theme(True, accent_hex, bg="#000000", surface="#020a05", surface2="#06180d", border="#14522c",
+                     text="#b9ffd0", muted="#5fbf84", accent2=accent2, danger="#ff4d4d", warning="#ffb000",
+                     success="#39ff88", live="#ff3b3b", ready="#39ff88", style=style)
+    if style == "regie":  # Mitternacht: Tintenblau, ruhige Flächen, Türkis nur für Auswahl
+        return Theme(True, accent_hex, bg="#0a0f1c", surface="#111829", surface2="#1a2338", border="#243049",
+                     text="#e8edf7", muted="#8b97b0", accent2=accent2, danger="#ff7a7a", warning="#fbbf24",
+                     success="#34d399", live="#ff6b6b", ready="#34d399", style=style)
+    if style == "technisch":  # Pult: Graphit bzw. gebürstetes Aluminium, Signal-Orange
         if dark:
-            return Theme(True, accent_hex, bg="#18191b", surface="#202124", surface2="#292a2e", border="#36383d",
-                         text="#e8e8e5", muted="#969a9f", danger="#ff5c4d", live="#ff4433", ready="#3ecf6e",
-                         style=style)
-        return Theme(False, accent_hex, bg="#e6e6e2", surface="#f7f7f5", surface2="#ededea", border="#c8c9c4",
-                     text="#17181a", muted="#5b5e63", danger="#d62f1f", live="#e0291a", ready="#178a3e", style=style)
+            return Theme(True, accent_hex, bg="#111214", surface="#1b1c1f", surface2="#26282c", border="#3a3c42",
+                         text="#ececea", muted="#9a9da3", accent2=accent2, danger="#ff5c4d", live="#ff3b30",
+                         ready="#3ddc84", style=style)
+        return Theme(False, accent_hex, bg="#d9dadd", surface="#f1f2f3", surface2="#e4e5e8", border="#b4b6bb",
+                     text="#141518", muted="#555860", accent2=accent2, danger="#d62f1f", live="#e0291a",
+                     ready="#178a3e", style=style)
     if style == "holz":
         bg, panel, panel_hi = wood_color(wood, "bg"), wood_color(wood, "panel"), wood_color(wood, "panel_hi")
         if dark:
             return Theme(True, accent_hex, bg=bg, surface=panel, surface2=panel_hi, border="#120b06",
-                         text="#f4ede2", muted="#d3c7b6", danger="#ff6a55", live="#ff3b2f", ready="#57d163",
-                         style=style, wood_kind=wood)
+                         text="#f6eee2", muted="#d6c9b6", accent2=accent2, danger="#ff6a55", live="#ff3b2f",
+                         ready="#57d163", style=style, wood_kind=wood)
         return Theme(False, accent_hex, bg=bg, surface=panel, surface2=panel_hi, border="#5e4026",
-                     text="#1c150e", muted="#3f3328", danger="#b3200f", live="#e3261b", ready="#1f7a34",
-                     style=style, wood_kind=wood)
-    if dark:
-        return Theme(True, accent_hex, bg="#131417", surface="#1e2024", surface2="#2a2d33", border="#30333a",
-                     text="#f2f3f5", muted="#9aa0aa", danger="#ff5f57", live="#ff4f45", ready="#30d158", style=style)
-    return Theme(False, accent_hex, bg="#eceef2", surface="#ffffff", surface2="#f1f2f5", border="#e1e4e9",
-                 text="#16181c", muted="#5f6670", danger="#dc3226", live="#e0352b", ready="#248a3d", style=style)
+                     text="#1c150e", muted="#3f3328", accent2=accent2, danger="#b3200f", live="#e3261b",
+                     ready="#1f7a34", style=style, wood_kind=wood)
+    if dark:  # Glas: tiefes Blaugrau, Flächen heben sich nur leicht ab, Kanten als feine helle Linie
+        return Theme(True, accent_hex, bg="#0e1016", surface="#171a23", surface2="#212532", border="#2b3040",
+                     text="#f3f4f8", muted="#9299ab", accent2=accent2, danger="#ff6b6b", live="#ff5a52",
+                     ready="#34d399", style=style)
+    return Theme(False, accent_hex, bg="#f2f3f8", surface="#ffffff", surface2="#eceef5", border="#dcdfea",
+                 text="#12141c", muted="#5d6475", accent2=accent2, danger="#dc3226", live="#e0352b",
+                 ready="#1f9d5c", style=style)
 
 
 # ------------------------------------------------------------------ Holz: Maserung und Aluminiumplatten
@@ -836,7 +844,7 @@ def _stylesheet(t: Theme, check_image: str = "", arrow_image: str = "") -> str:
     sel = t.soft(a1, 0.18 if t.dark else 0.12)
     field = t.mix(t.bg, t.surface, 0.5).name() if t.dark else "#ffffff"
     number_font = f'font-family: "{MONO_FONT}";' if t.technical else ""
-    title_pt, title_w = {"technisch": (19, 600), "holz": (25, 600), "regie": (19.5, 600)}.get(t.kind, (22, 700))
+    title_pt, title_w = {"technisch": (18, 700), "holz": (24, 600), "regie": (20, 600)}.get(t.kind, (21, 700))
     group_pt = 13.5 if t.wood else 11.5
     window_bg = t.bg
     side = t.mix(t.bg, "#000000", 0.18).name() if t.dark else t.mix(t.bg, "#ffffff", 0.5).name()
@@ -849,124 +857,148 @@ def _stylesheet(t: Theme, check_image: str = "", arrow_image: str = "") -> str:
     btn_line = line   # Rand von Knöpfen
     extra = ""
     rcmd = rf  # Befehlsleiste
-    if t.style == "normal":  # modern: weiche Flächen ohne harte Ränder, Knöpfe als Pillen, Seitenleiste schwebt
-        card_line = btn_line = "transparent"
+    dark_check = check_image.replace("alupc-check", "alupc-check-dark") if check_image else ""
+    grad = f"qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {a1}, stop:1 {t.accent2})"
+    grad_hi = (f"qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {t.mix(a1, '#ffffff', 0.14).name()}, "
+               f"stop:1 {t.mix(t.accent2, '#ffffff', 0.14).name()})")
+    if t.style == "normal":  # „Glas“: ruhige Flächen mit feiner heller Oberkante, Verlauf nur am Hauptknopf
+        edge = t.mix(line, "#ffffff", 0.16 if t.dark else 0.0).name()  # Lichtkante oben (wie Glas)
         side = t.surface
-        hover = t.mix(t.surface2, t.text, 0.08).name()
-        pressed = t.mix(t.surface2, t.text, 0.14).name()
+        hover = t.mix(t.surface2, t.text, 0.07).name()
+        pressed = t.mix(t.surface2, t.text, 0.13).name()
         btn_hover = f"background: {hover};"
         btn_down = f"background: {pressed};"
-        hero_tint = t.mix(t.surface, a1, 0.16 if t.dark else 0.08).name()
-        rcmd = min(23, round(23 * t.radius_scale))
-        dialog_top = t.mix(t.bg, a1, 0.10 if t.dark else 0.06).name()
+        glow = t.mix(t.bg, a1, 0.09 if t.dark else 0.05).name()
+        window_bg = f"qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {glow}, stop:0.55 {t.bg})"
+        hero_tint = t.mix(t.surface, t.accent2, 0.14 if t.dark else 0.07).name()
+        rcmd = min(14, round(14 * t.radius_scale))
+        page_icon = f"background: {grad}; border: none;"
         extra = f"""
+#Card, QGroupBox, #Hero {{ border: 1px solid {line}; border-top: 1px solid {edge}; }}
 #Hero {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {t.surface}, stop:1 {hero_tint}); }}
-#Sidebar {{ margin: 12px 0 12px 12px; border-radius: 22px; border: none; }}
-QDialog {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {dialog_top}, stop:0.45 {t.bg}); }}
-#LiveDock {{ margin: 12px 12px 12px 0; border-radius: 22px; border: none; }}
-QPushButton#CommandBar {{ background: {t.surface}; border-color: transparent; }}
-QPushButton {{ padding: 7px 16px; }}
-QPushButton#Chip {{ border-radius: 16px; padding: 6px 14px; }}
-QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {{ background: {t.surface2}; border-color: transparent; }}
-QLineEdit:hover, QComboBox:hover, QSpinBox:hover, QDoubleSpinBox:hover {{ border-color: {line_hi}; }}
+#Sidebar {{ margin: 10px 0 10px 10px; border-radius: 18px; border: 1px solid {line}; border-top: 1px solid {edge}; }}
+#LiveDock {{ margin: 10px 10px 10px 0; border-radius: 18px; border: 1px solid {line}; border-top: 1px solid {edge}; }}
+QPushButton, QToolButton#Plain {{ padding: 7px 15px; border-top: 1px solid {edge}; }}
+QPushButton[primary="true"] {{ background: {grad}; border: none; padding: 8px 16px; }}
+QPushButton[primary="true"]:hover {{ background: {grad_hi}; }}
+QPushButton[primary="true"]:pressed {{ background: {a1}; }}
+QPushButton#Chip {{ border-radius: 15px; padding: 5px 13px; }}
+QPushButton#Chip:checked {{ background: {sel}; border-color: {a1}; }}
 QGroupBox {{ padding: 20px 18px 16px 18px; }}
-QMenu {{ border-radius: 14px; padding: 6px; }}
-QMenu::item {{ border-radius: 9px; }}
-QListWidget {{ border-color: transparent; }}
-QListWidget#SetupNav {{ border-color: transparent; padding: 6px; }}
-QListWidget#SetupNav::item {{ border-left: none; border-radius: 12px; }}
+QMenu {{ border-radius: 12px; padding: 6px; }}
+QMenu::item {{ border-radius: 8px; }}
+QListWidget#SetupNav {{ padding: 6px; }}
+QListWidget#SetupNav::item {{ border-left: none; border-radius: 10px; }}
 QListWidget#SetupNav::item:selected {{ border-left: none; }}
+QSlider::sub-page:horizontal, QProgressBar::chunk {{ background: {grad}; }}
 """
-    matrix_extra = ""
-    if t.matrix:
-        matrix_extra = f"""
+    if t.regie:  # „Mitternacht“: Tintenblau, Pillen-Knöpfe, Türkis nur für Auswahl und Hauptknopf
+        ctrl = t.mix(line, "#ffffff", 0.10).name()
+        field_r = t.mix(t.bg, "#000000", 0.25).name()
+        field = field_r
+        side = t.mix(t.bg, "#000000", 0.20).name()
+        page_icon = f"background: {t.soft(a1, 0.16)}; border: 1px solid {t.soft(a1, 0.45)};"
+        rcmd = min(20, round(20 * t.radius_scale))
+        extra = f"""
+#Sidebar {{ background: {side}; border-right: 1px solid {line}; }}
+#LiveDock {{ background: {side}; border-left: 1px solid {line}; }}
+#PageTitle {{ font-weight: 600; }}
+#SectionTitle, QGroupBox::title {{ color: {t.muted}; font-weight: 600; }}
+#Card, QGroupBox, #Hero {{ background: {t.surface}; border: 1px solid {line}; }}
+QPushButton, QToolButton#Plain {{ background: {t.surface2}; border: 1px solid {ctrl}; font-weight: 500; padding: 7px 16px; }}
+QPushButton:hover, QToolButton#Plain:hover {{ background: {t.mix(t.surface2, "#ffffff", 0.07).name()}; border-color: {t.soft(a1, 0.55)}; }}
+QPushButton:pressed {{ background: {t.surface}; }}
+QPushButton[primary="true"] {{ background: {a1}; border: 1px solid {a1}; color: {on_accent}; font-weight: 700; }}
+QPushButton[primary="true"]:hover {{ background: {t.mix(a1, "#ffffff", 0.18).name()}; }}
+QPushButton:checked {{ background: {t.soft(a1, 0.16)}; border-color: {a1}; color: {t.text}; }}
+QPushButton#Chip {{ background: transparent; border: 1px solid {ctrl}; color: {t.muted}; font-weight: 500; border-radius: 15px; }}
+QPushButton#Chip:hover {{ color: {t.text}; }}
+QPushButton#Chip:checked {{ background: {t.soft(a1, 0.16)}; color: {t.text}; border-color: {a1}; }}
+QPushButton#Segment {{ border-radius: 15px; }}
+QLineEdit, QPlainTextEdit, QComboBox, QSpinBox, QDoubleSpinBox {{ background: {field_r}; border-color: {ctrl}; }}
+QListWidget::item:selected, QListWidget#SetupNav::item:selected {{ background: {t.soft(a1, 0.14)}; color: {t.text};
+    border-left: 2px solid {a1}; font-weight: 600; }}
+QCheckBox::indicator:checked, QListWidget::indicator:checked, QMenu::indicator:checked {{
+    {f'image: url("{dark_check}");' if dark_check else ''} }}
+QPushButton#CommandBar {{ background: {field_r}; border-color: {line}; }}
+#DockTitle {{ color: {t.muted}; font-weight: 600; font-size: 9pt; }}
+"""
+    if t.technical and not t.matrix:  # „Pult“: Tasten mit Kante wie an einem Gerät, Beschriftung in Ziffernschrift
+        side = t.mix(t.bg, "#000000", 0.25).name() if t.dark else t.mix(t.bg, "#000000", 0.06).name()
+        page_icon = f"background: {a1}; border: none;"
+        top = t.mix(t.surface2, "#ffffff", 0.07 if t.dark else 0.5).name()
+        low = t.mix(t.surface2, "#000000", 0.16 if t.dark else 0.06).name()
+        lip = t.mix(t.bg, "#000000", 0.5 if t.dark else 0.28).name()  # dunkle Unterkante = Taste steht hervor
+        extra = f"""
+#Card, QGroupBox, #Hero {{ border: 1px solid {line}; border-left: 3px solid {a1}; }}
+#Sidebar {{ border-right: 2px solid {lip}; }}
+#LiveDock {{ border-left: 2px solid {lip}; }}
+QGroupBox::title, #SectionTitle, #DockTitle {{ font-family: "{MONO_FONT}"; font-weight: 600; color: {t.muted}; }}
+QPushButton, QToolButton#Plain {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {top}, stop:1 {low});
+    border: 1px solid {line}; border-bottom: 3px solid {lip}; }}
+QPushButton:hover, QToolButton#Plain:hover {{ border-color: {line_hi}; border-bottom-color: {lip}; }}
+QPushButton:pressed {{ background: {low}; border-bottom-width: 1px; padding-top: 8px; }}
+QPushButton[primary="true"] {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {t.mix(a1, "#ffffff", 0.18).name()},
+    stop:1 {a1}); border: 1px solid {t.mix(a1, "#000000", 0.25).name()}; border-bottom: 3px solid {t.mix(a1, "#000000", 0.45).name()}; }}
+QPushButton:checked, QPushButton#Chip:checked, QPushButton#Segment:checked {{ background: {a1}; color: {on_accent};
+    border-color: {t.mix(a1, "#000000", 0.25).name()}; border-bottom-color: {t.mix(a1, "#000000", 0.45).name()}; }}
+QPushButton#CornerButton, QPushButton#CommandBar {{ border-bottom-width: 1px; }}
+QDialog {{ border-top: 3px solid {a1}; }}
+#DockTitle {{ border-left: 3px solid {a1}; padding-left: 7px; }}
+"""
+    if t.matrix:  # „Terminal“: eckig, gestrichelte Rahmen, Auswahl = umgekehrte Farben (grün gefüllt, schwarze Schrift)
+        side = "#000000"
+        field = "#000000"
+        page_icon = f"background: transparent; border: 1px solid {a1};"
+        extra = f"""
 QWidget {{ font-family: "{MONO_FONT}"; }}
 #Output, #Output QWidget {{ font-family: "{UI_FONT}"; }}
 #PageTitle, #PanelTitle, #Brand {{ color: {a1}; }}
-#Sidebar, #LiveDock {{ border-color: {line}; }}
-QPushButton[primary="true"] {{ background: {a1}; color: #001a09; }}
-QLineEdit, QComboBox, QSpinBox {{ background: #000000; border-color: {line}; }}
-QLineEdit:focus, QComboBox:focus {{ border-color: {a1}; }}
+#Sidebar {{ border-right: 1px solid {a1}; }}
+#LiveDock {{ border-left: 1px solid {a1}; }}
+#Card, QGroupBox, #Hero {{ border: 1px dashed {line}; }}
+QGroupBox::title, #SectionTitle {{ color: {a1}; }}
+QPushButton, QToolButton#Plain {{ background: #000000; border: 1px solid {line}; color: {t.text}; }}
+QPushButton:hover, QToolButton#Plain:hover {{ background: {t.surface2}; border-color: {a1}; color: {a1}; }}
+QPushButton:pressed {{ background: {a1}; color: #000000; }}
+QPushButton[primary="true"] {{ background: {a1}; border: 1px solid {a1}; color: #000000; }}
+QPushButton:checked, QPushButton#Chip:checked, QPushButton#Segment:checked {{ background: {a1}; color: #000000; border-color: {a1}; }}
+QListWidget::item:selected, QListWidget#SetupNav::item:selected, QMenu::item:selected,
+QComboBox QAbstractItemView::item:selected {{ background: {a1}; color: #000000; }}
+QLineEdit, QPlainTextEdit, QComboBox, QSpinBox, QDoubleSpinBox {{ background: #000000; border: 1px solid {line}; }}
+QCheckBox::indicator:checked, QListWidget::indicator:checked, QMenu::indicator:checked {{
+    {f'image: url("{dark_check}");' if dark_check else ''} }}
+QMenu, QComboBoxPrivateContainer {{ border: 1px solid {a1}; }}
+QDialog {{ border: 1px solid {line}; }}
+#DockTitle {{ color: {a1}; }}
+QTabBar::tab:selected {{ color: {a1}; }}
 """
-    if t.regie:
-        ctrl = "#2c2f31"  # Rand von Bedienelementen: eine Stufe über der Haarlinie
-        field_r = "#101111"
-        side = t.bg
-        page_icon = "background: transparent; border: none;"  # Titel ohne Symbol-Kasten
-        extra = f"""
-#Sidebar {{ background: {t.bg}; border-right: 1px solid {line}; }}
-#LiveDock {{ background: {t.bg}; border-left: 1px solid {line}; }}
-#PageTitle {{ letter-spacing: 0.2px; }}
-#PageSubtitle, #BrandSub {{ color: {t.muted}; }}
-#SectionTitle, QGroupBox::title {{ color: {t.muted}; font-weight: 500; }}
-#Card, QGroupBox, #Hero {{ background: {t.surface}; border: 1px solid {line}; }}
-QPushButton, QToolButton#Plain {{ background: transparent; border: 1px solid {ctrl}; color: {t.text}; font-weight: 500;
-    padding: 7px 14px; }}
-QPushButton:hover, QToolButton#Plain:hover {{ background: {t.surface2}; border-color: {t.mix(ctrl, "#ffffff", 0.18).name()}; }}
-QPushButton:pressed {{ background: {field_r}; }}
-QPushButton[primary="true"] {{ background: #ffffff; border: 1px solid #ffffff; color: #000000; font-weight: 600; }}
-QPushButton[primary="true"]:hover {{ background: #f0f0f0; }}
-QPushButton[primary="true"]:pressed {{ background: #e8e8e8; }}
-QPushButton:checked {{ background: {t.surface2}; border-color: {ctrl}; border-bottom: 1px solid {a1}; }}
-QPushButton#Chip {{ background: transparent; border: 1px solid {ctrl}; color: {t.muted}; font-weight: 500; }}
-QPushButton#Chip:hover {{ color: {t.text}; }}
-QPushButton#Chip:checked {{ background: {t.surface2}; color: {t.text}; border-color: {ctrl}; border-bottom-color: {a1}; }}
-QPushButton#Segment {{ background: transparent; border: none; border-bottom: 1px solid transparent; border-radius: 0;
-    color: {t.muted}; padding: 6px 2px; margin: 0 10px; min-width: 0; font-weight: 500; }}
-QPushButton#Segment:hover {{ color: {t.text}; background: transparent; }}
-QPushButton#Segment:checked {{ color: {t.text}; border-bottom: 1px solid {a1}; background: transparent; }}
-QTabBar::tab:selected {{ border-bottom: 1px solid {a1}; }}
-QLineEdit, QPlainTextEdit, QComboBox, QSpinBox, QDoubleSpinBox {{ background: {field_r}; border-color: {ctrl}; }}
-QListWidget::item:selected, QListWidget#SetupNav::item:selected {{ background: {t.surface2}; color: {t.text};
-    border-left: 1px solid {a1}; font-weight: 600; }}
-QListWidget#SetupNav {{ background: {t.surface}; border-color: {line}; }}
-QComboBox QAbstractItemView::item:selected, QMenu::item:selected {{ background: {t.surface2}; color: {t.text}; }}
-QMenu, QComboBoxPrivateContainer {{ background: {t.surface}; border: 1px solid {line}; }}
-QCheckBox::indicator, QListWidget::indicator, QMenu::indicator {{ background: {field_r}; border: 1px solid {ctrl}; }}
-QCheckBox::indicator:checked, QListWidget::indicator:checked, QMenu::indicator:checked {{ background: #ffffff;
-    border: 1px solid #ffffff; {f'image: url("{check_image.replace("alupc-check", "alupc-check-dark")}");' if check_image else ''} }}
-QRadioButton::indicator:checked {{ background: #ffffff; border: 4px solid {field_r}; }}
-QSlider::sub-page:horizontal, QSlider::add-page:vertical, QProgressBar::chunk {{ background: {t.text}; }}
-QPushButton#CommandBar {{ background: {field_r}; border-color: {line}; }}
-QToolTip {{ background: {t.surface2}; border: 1px solid {line}; }}
-#DockTitle {{ color: {t.muted}; font-weight: 500; font-size: 9pt; }}
-"""
-    if t.technical:
-        side = t.surface
-        page_icon = f"background: transparent; border: 1px solid {line_hi};"
-        extra = f"""
-#Card, QGroupBox, #Hero {{ border-top: 2px solid {a1}; }}
-#LiveDock {{ border-top: 2px solid {a1}; }}
-QPushButton#Chip {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {t.mix(t.surface2, "#ffffff", 0.06).name()},
-    stop:1 {t.mix(t.surface, "#000000", 0.15).name()}); border: 1px solid {line}; border-bottom: 2px solid {t.mix(t.bg, "#000000", 0.4).name()}; }}
-QPushButton#Chip:checked {{ background: {a1}; color: {on_accent}; border-color: {a1}; border-bottom-color: {t.mix(a1, "#000000", 0.35).name()}; }}
-QPushButton#Chip:pressed {{ border-bottom-width: 1px; padding-top: 6px; }}
-{matrix_extra}
-QDialog {{ border-top: 2px solid {a1}; }}
-#DockTitle {{ font-family: "{MONO_FONT}"; font-weight: 600; border-left: 3px solid {a1}; padding-left: 7px; }}
-"""
-    if t.wood:
+    if t.wood:  # Holz: Furnier bleibt, Bedienelemente neu – Kupfer-Einlage, Karten mit heller Lichtkante
         def img(part: str) -> str:
             f = wood_file(t.wood_kind, part)
             return f'background-image: url("{f}");' if f else ""
-        hi = "rgba(255,255,255,0.18)" if t.dark else "rgba(255,255,255,0.55)"
+        hi = "rgba(255,255,255,0.22)" if t.dark else "rgba(255,255,255,0.6)"
         card = f"background-color: {t.surface}; {img('panel')}"
         btn = card
         btn_hover = f"background-color: {t.surface2}; {img('panel_hi')}"
         btn_down = f"background-color: {t.surface}; {img('panel_lo')}"
-        page_icon = f"background-color: {t.surface}; {img('panel')} border: 1px solid {t.border};"
+        page_icon = f"background: {grad}; border: 1px solid {t.mix(a1, '#000000', 0.3).name()};"
         line, line_hi = t.border, t.mix(t.border, t.text, 0.35).name()
-        field = t.mix(t.bg, "#000000", 0.35).name() if t.dark else t.mix(t.surface, "#ffffff", 0.6).name()
+        field = t.mix(t.bg, "#000000", 0.4).name() if t.dark else t.mix(t.surface, "#ffffff", 0.7).name()
         window_bg = f"{t.bg}; {img('bg')}"
         side = f"{t.bg}; {img('side')}"
-        brass_hi = t.mix(a1, "#ffffff", 0.25).name()
-        brass_lo = t.mix(a1, "#000000", 0.18).name()
+        metal_hi = t.mix(a1, "#ffffff", 0.3).name()
+        metal_lo = t.mix(a1, "#000000", 0.22).name()
         extra = f"""
-QPushButton[primary="true"] {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {brass_hi}, stop:1 {a1});
-    border: 1px solid {brass_lo}; }}
-QPushButton[primary="true"]:pressed {{ background: {brass_lo}; }}
+QPushButton[primary="true"] {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {metal_hi}, stop:0.5 {a1},
+    stop:1 {metal_lo}); border: 1px solid {metal_lo}; }}
+QPushButton[primary="true"]:pressed {{ background: {metal_lo}; }}
+QPushButton:checked, QPushButton#Chip:checked, QPushButton#Segment:checked {{ border: 1px solid {a1};
+    border-bottom: 3px solid {a1}; }}
 QListWidget, QMenu, QComboBox QAbstractItemView, QComboBoxPrivateContainer {{ background-color: {t.surface}; }}
 #Card, QGroupBox, #Hero, QPushButton {{ border-top-color: {hi}; }}
+#Card, QGroupBox, #Hero {{ border-bottom: 2px solid {a1}; }}
+QSlider::sub-page:horizontal, QProgressBar::chunk {{ background: {grad}; }}
 """
     return f"""
 * {{ outline: none; }}

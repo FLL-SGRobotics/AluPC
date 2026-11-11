@@ -1684,12 +1684,6 @@ class CountdownSource(TextBase):
         self.timer.stop()
 
 
-def format_countdown(seconds: int) -> str:
-    h, rest = divmod(seconds, 3600)
-    m, s = divmod(rest, 60)
-    return f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
-
-
 class ColorSource(QWidget):
     def __init__(self, cfg, parent=None):
         super().__init__(parent)

@@ -144,8 +144,6 @@ class AudioRouting(QObject):
             return mixer.virtual_devices(configured, snap.get("out"), snap.get("in"))
         return mixer.virtual_devices(configured)
 
-    def has_route(self, src: str, dst: str) -> bool:
-        return [src, dst] in self.cfg()["routes"]
 
     # ---- Wirklichkeit
     def _resolve(self) -> set[tuple[str, str]]:

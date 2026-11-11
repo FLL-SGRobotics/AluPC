@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtGui import QPainter, QPen
 
 from .duel import LETTERS, SIZE
 from .game_draw import qc, text
@@ -120,10 +120,3 @@ def headline(view: dict) -> tuple[str, str]:
     return ("Du bist dran!", "#86efac") if view["turn"] == me else (f"{view['other']} ist dran", "#fcd34d")
 
 
-def ship_dots(p: QPainter, rect: QRectF, left: int, total: int) -> None:
-    """Kleine Anzeige „noch x Schiffe“."""
-    d = min(rect.height(), rect.width() / max(1, total) * 0.7)
-    for i in range(total):
-        p.setPen(Qt.NoPen)
-        p.setBrush(QColor(SHIP) if i < left else qc(SUNK))
-        p.drawRoundedRect(QRectF(rect.x() + i * d * 1.4, rect.y() + (rect.height() - d) / 2, d, d), d * 0.3, d * 0.3)

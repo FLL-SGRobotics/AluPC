@@ -9,7 +9,6 @@ Rückgängig bleiben beim PC und bei freigegebenen Steuer-Handys.
 from __future__ import annotations
 
 import re
-import secrets
 import threading
 import time
 
@@ -40,9 +39,6 @@ class BoardGuests:
     def valid_id(gid: str) -> bool:
         return bool(re.fullmatch(r"[A-Za-z0-9_-]{8,40}", str(gid or "")))
 
-    @staticmethod
-    def new_id() -> str:
-        return secrets.token_urlsafe(12)
 
     def state(self, mode: str, gid: str) -> str:
         """„aus“, „frei“ (darf schreiben), „warten“, „nein“, „fragen“ (noch nicht gefragt)."""

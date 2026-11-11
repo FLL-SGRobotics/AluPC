@@ -19,7 +19,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPolygonF, QRadialGradient, QTransform
 
-from .whiteboard import BACKGROUNDS, DEFAULT, is_dark, pen_color_for
+from .whiteboard import BACKGROUNDS, DEFAULT, is_dark
 
 FORMATS = {"16:9": ("Breit (16:9)", 1600, 900), "a4": ("A4 hoch", 1240, 1754), "a4quer": ("A4 quer", 1754, 1240),
            "unendlich": ("Unendlich (ohne Rand)", 1600, 900)}
@@ -765,5 +765,3 @@ def paint_board(p: QPainter, rect: QRectF, board: Board, live: bool = True) -> N
     p.restore()
 
 
-def default_pen(bg: str, color: str) -> str:
-    return pen_color_for(bg, color)

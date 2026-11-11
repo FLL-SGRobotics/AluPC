@@ -605,6 +605,29 @@ def state(max_age: float = 2.0) -> dict | None:
     return result
 
 
+_REFRESH = {"busy": False}
+
+
+def cached_state(max_age: float = 2.0) -> dict | None:
+    """Wie state(), blockiert aber nie: gibt sofort den zuletzt gelesenen Stand zurück und liest – wenn er älter als
+    max_age ist – im Hintergrund neu. Für die Oberfläche: state() fragt bis zu fünfmal das System ab (je mehr
+    Ton-Geräte, desto länger); im Oberflächen-Thread ließ das alle 2 s das ganze Fenster kurz hängen."""
+    if time.monotonic() - _CACHE["t"] >= max_age and not _REFRESH["busy"]:
+        _REFRESH["busy"] = True
+
+        def work():
+            try:
+                if state(0) is None:
+                    _CACHE.update(t=time.monotonic(), state=None)  # „geht hier nicht“ auch merken
+            except Exception:  # noqa: BLE001 - Ton-Dienst weg o. Ä.: alten Stand behalten
+                _CACHE["t"] = time.monotonic()
+            finally:
+                _REFRESH["busy"] = False
+
+        threading.Thread(target=work, name="alupc-ton-stand", daemon=True).start()
+    return _CACHE["state"]
+
+
 def run(cmd: str) -> str:
     """Befehle (Handy/Sprache): ton_laut:N, ton_stumm:0|1, ton_geraet:i, mic_laut:N, mic_stumm:0|1, mic_geraet:i."""
     name, _, arg = cmd.partition(":")

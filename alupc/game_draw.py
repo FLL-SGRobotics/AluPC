@@ -595,38 +595,6 @@ def _team_result(c, m, t):
     _board_footer(c, m)
 
 
-# =========================================================================== Ausscheiden (Simon)
-def _alive_strip(c, g, top, m, answered=None, progress=None, seq_len=0) -> None:
-    """Spieler-Kacheln unten: wer ist noch drin, wer ist raus (mit Wackeln und rotem Blitz)."""
-    p, w, h, now = c.p, c.w, c.h, c.now
-    pids = sorted(g.players, key=lambda pid: (pid not in g.alive, -g.out_round.get(pid, 0), name_of(c, pid)))
-    cols = min(6, max(1, len(pids)))
-    rows = max(1, math.ceil(len(pids) / cols))
-    gap = m * 0.4
-    cw = (w - 2 * m - gap * (cols - 1)) / cols
-    ch = min(h * 0.07, (h - top - m) / rows - gap)
-    for i, pid in enumerate(pids):
-        r, col = divmod(i, cols)
-        rect = QRectF(m + col * (cw + gap), top + r * (ch + gap), cw, ch)
-        out = pid not in g.alive
-        born = c.fx.born.get(("out", pid))
-        shake = 0.0
-        if born is not None:
-            age = now - born
-            if age < 0.6:
-                shake = math.sin(age * 60) * h * 0.008 * (1 - age / 0.6)
-                if ("outfx", pid) not in c.fx.born:
-                    c.fx.born[("outfx", pid)] = now
-                    burst(c.fx, rect.center().x(), rect.center().y(), "#ef4444", now, n=22, speed=260)
-        mark = "RAUS" if out else ""
-        if not out and answered is not None and pid in answered:
-            mark = "✓"
-        if not out and progress is not None:
-            mark = "✓" if pid in getattr(g, "done", ()) else ("✗" if pid in getattr(g, "failed", ()) else
-                                                               f"{progress.get(pid, 0)}/{seq_len}")
-        chip(p, rect.translated(shake, 0), name_of(c, pid), color_of(c, pid), avatar=avatar_of(c, pid), mark=mark, dim=0.35 if out else 1.0)
-
-
 # =========================================================================== Simon sagt
 def simon(c, g, events) -> None:
     from .games_party import SIMON_PADS

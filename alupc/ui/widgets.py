@@ -165,15 +165,6 @@ class HoverMixin:
         super().leaveEvent(e)
 
 
-# --------------------------------------------------------------------------- Kachel
-def _partner(color: QColor) -> QColor:
-    """Nachbarfarbe für zweifarbige Verläufe (Farbton ~28° weiter, etwas dunkler)."""
-    h, s, v, a = color.getHsv()
-    if h < 0:  # Grau
-        return color.darker(115)
-    return QColor.fromHsv((h + 28) % 360, min(255, s + 10), max(0, int(v * 0.9)), a)
-
-
 class Tile(HoverMixin, QAbstractButton):
     """Kachel der Startseite: Symbol, Name, Untertitel – läuft sie, steht statt des Untertitels der Zustand
     („Läuft“, „An“, „04:12“) in Rot. Form je Stil: Normal = Karte, Technisch = dichte Zeile, Holz = Alu-Platte

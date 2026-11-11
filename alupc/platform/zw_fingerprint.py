@@ -381,13 +381,6 @@ def windows_adapter_without_driver() -> str:
     return ""
 
 
-def usb_serial_present() -> bool:
-    """Steckt ein USB-Seriell-Adapter (auch wenn kein Zugriff besteht)?"""
-    if not HAVE_SERIAL:
-        return False
-    return any(p.vid is not None for p in list_ports.comports())
-
-
 # --------------------------------------------------------------------------- Namen der Plätze
 def _slots_file() -> Path:
     from ..config import config_dir

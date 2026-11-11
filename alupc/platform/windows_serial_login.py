@@ -171,25 +171,6 @@ def protect(password: str) -> str:
         ctypes.windll.kernel32.LocalFree(out.pbData)
 
 
-def unprotect(hex_blob: str) -> str:
-    """Gegenstück (für Tests und die Diagnose – der Anmeldebaustein macht das selbst in C++)."""
-    import ctypes
-
-    DATA_BLOB = _blob_type()
-    data = bytes.fromhex(hex_blob)
-    inp = DATA_BLOB(len(data), ctypes.cast(ctypes.create_string_buffer(data, len(data)), ctypes.POINTER(ctypes.c_char)))
-    ent = DATA_BLOB(len(ENTROPY), ctypes.cast(ctypes.create_string_buffer(ENTROPY, len(ENTROPY)),
-                                              ctypes.POINTER(ctypes.c_char)))
-    out = DATA_BLOB()
-    if not ctypes.windll.crypt32.CryptUnprotectData(ctypes.byref(inp), None, ctypes.byref(ent), None, None, 0x1,
-                                                    ctypes.byref(out)):
-        raise LoginError("Entschlüsseln fehlgeschlagen")
-    try:
-        return ctypes.string_at(out.pbData, out.cbData).decode("utf-8")
-    finally:
-        ctypes.windll.kernel32.LocalFree(out.pbData)
-
-
 def current_account() -> tuple[str, str]:
     """(Benutzername, Domäne) – lokale Konten und mit Microsoft-Konto verknüpfte: Domäne „.“."""
     user = os.environ.get("USERNAME", "")

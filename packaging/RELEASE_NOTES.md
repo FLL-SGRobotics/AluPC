@@ -9,6 +9,16 @@
 | Linux (x86_64) | `AluPC-linux-x86_64-….tar.gz` | ohne Installation: entpacken, `AluPC/AluPC` starten |
 | Kubuntu / Ubuntu | `AluPC-installieren.sh` | installiert die .deb daneben (oder lädt sie), wartet auf laufende Updates |
 
+### Neu in 2.5.0 – Alle fünf Designs neu, flüssiger, aufgeräumt
+- **Alle Stile neu gestaltet:** Normal „Glas“ (tiefes Blaugrau, feine Lichtkanten, Indigo-Violett-Verlauf am
+  Hauptknopf), Technisch „Pult“ (Graphit bzw. Aluminium, Tasten mit Kante, Signal-Orange), Holz (Furnier bleibt,
+  Kupfer statt Messing, Karten mit Kupferkante), Matrix „Terminal“ (reines Schwarz, eckig, gestrichelte Rahmen,
+  Auswahl in umgekehrten Farben), Regie „Mitternacht“ (Tintenblau, Pillen-Knöpfe, Türkis).
+- **Flüssiger:** Bei jeder Aktualisierung der Oberfläche wurden alle Ton-Geräte im Oberflächen-Thread abgefragt
+  (alle 2 s bis zu fünf Systemabfragen – je mehr Geräte, desto länger hing das Fenster). Läuft jetzt im Hintergrund.
+- **Aufgeräumt:** rund 190 Zeilen ungenutzter Code entfernt (22 Funktionen, die nirgends mehr aufgerufen wurden).
+- Geprüft am PC (Tests, Einstellungs-Check, alle Arduino-Programme kompiliert); nicht auf echter Hardware.
+
 ### Neu in 2.4.4 – AirPlay wieder im Vollbild (Windows)
 - **AirPlay-Bild füllt Monitor 2 wieder ganz:** UxPlay setzt sein Fenster auf die Videogröße zurück, sobald das
   iPhone-Bild kommt oder sich dreht (auf einem 4K-Fernseher nur noch ein Viertel oben links). AluPC prüft das

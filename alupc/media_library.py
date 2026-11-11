@@ -107,12 +107,6 @@ def remember(config, cfg: dict) -> None:
     config["media"] = media
 
 
-def clear_recent(config) -> None:
-    media = _lists(config)
-    media["recent"] = []
-    config["media"] = media
-
-
 def file_type(path: str) -> str | None:
     """„image“/„video“ nach Dateiendung – None, wenn unbekannt."""
     from .sources import IMAGE_SUFFIXES

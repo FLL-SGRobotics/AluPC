@@ -10,7 +10,7 @@ from __future__ import annotations
 import sys
 
 from PySide6.QtCore import QObject, QPoint, QPointF, QRect, QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QCursor, QGuiApplication, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QCursor, QPainter, QPainterPath, QPen
 
 from .platform.linux_display import is_wayland
 
@@ -357,8 +357,3 @@ class CursorGuard(QObject):
             self._release()
 
 
-def screen_at(pos: QPoint):
-    for s in QGuiApplication.screens():
-        if s.geometry().contains(pos):
-            return s
-    return None

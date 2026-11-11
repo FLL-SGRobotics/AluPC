@@ -114,9 +114,6 @@ class HotkeyButton(QPushButton):
     def sequence(self) -> str:
         return self._seq
 
-    def set_sequence(self, seq: str) -> None:
-        self._seq = seq or ""
-        self._update()
 
     def _update(self):
         self.setText(pretty(self._seq) + "   ✎")

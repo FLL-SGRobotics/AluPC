@@ -49,8 +49,6 @@ class SoundPicker(QWidget):
     def spec(self) -> str:
         return self._current
 
-    def set_spec(self, spec: str):
-        self._fill(spec)
 
     def _chosen(self, _index):
         data = self.combo.currentData()
